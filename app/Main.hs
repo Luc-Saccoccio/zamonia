@@ -4,7 +4,8 @@ import           Data.Aeson
 import qualified Data.ByteString.Lazy as BS
 import           Data.Semigroup       ((<>))
 import           Options.Applicative
-import           Zamonie
+import           System.Directory
+import           Zamonia
 
 data Usage = Usage
     { file :: FilePath
@@ -24,13 +25,12 @@ usage = Usage <$> file <*> zCommand
            <> cmd mod  "modify" "Modify first matching work from list"
            <> cmd list "list" "List entries from list"
            <> cmd search "search" "Search keyword in list"
-           <> cmd init "init" "Init a Zamonia database"
+           <> command "init" (info (pure Init) (progDesc "Init a Zamonia database"))
           add       = Add <$> strArg "LIST"    <*> strArg "TITLE"
           del       = Delete <$> strArg "LIST" <*> strArg "INDEX"
           mod       = Modify <$> strArg "LIST" <*> strArg "INDEX"
           list      = List <$> strArg "LIST"
           search    = Search <$> strArg "LIST" <*> strArg "FIELD" <*> strArg "SEARCH"
-          init      = Init
           cmd p n d = command n (info (helper <*> p) (progDesc d))
           strArg n  = strArgument (metavar n)
 
@@ -40,3 +40,9 @@ main = do
             ( fullDesc
             <> progDesc "CLI personal library database"
             <> header "zamonia - a CLI personal library database written in haskell" ))
+    case zCmd execution of
+      Init -> do
+          createDirectory "lists"
+          writeFile "lists/series.json" ""
+          writeFile "lists/films.json" ""
+      _    -> putStrLn "Other Action"

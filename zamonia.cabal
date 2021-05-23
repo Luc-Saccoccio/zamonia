@@ -1,9 +1,9 @@
 cabal-version:  2.2
-name:           zamonie
+name:           zamonia
 version:        0.1.0.0
-description:    Please see the README on GitHub at <https://github.com/githubuser/zamonie#readme>
-homepage:       https://github.com/Luc-Saccoccio/zamonie
-bug-reports:    https://github.com/Luc-Saccoccio/zamonie/issues
+description:    Please see the README on GitHub at <https://github.com/Luc-Saccoccio/zamonia>
+homepage:       https://github.com/Luc-Saccoccio/zamonia
+bug-reports:    https://github.com/Luc-Saccoccio/zamonia/issues
 author:         Luc Saccoccio
 maintainer:     Luc-Saccoccio
 copyright:      2021 Luc Saccoccio
@@ -15,13 +15,13 @@ extra-source-files:
 
 source-repository head
   type: git
-  location: https://github.com/githubuser/zamonie
+  location: https://github.com/githubuser/zamonia
 
 library
   exposed-modules:
-      Zamonie
+      Zamonia
   other-modules:
-      Paths_zamonie
+      Paths_zamonia
   hs-source-dirs:
       src
   build-depends:
@@ -32,10 +32,10 @@ library
     , hashmap
   default-language: Haskell2010
 
-executable zamonie
+executable zamonia
   main-is: Main.hs
   other-modules:
-      Paths_zamonie
+      Paths_zamonia
   hs-source-dirs:
       app
   ghc-options: -threaded -rtsopts -with-rtsopts=-N
@@ -44,19 +44,19 @@ executable zamonie
     , optparse-applicative
     , aeson
     , bytestring
-    , hashmap
-    , zamonie
+    , directory
+    , zamonia
   default-language: Haskell2010
 
-test-suite zamonie-test
+test-suite zamonia-test
   type: exitcode-stdio-1.0
   main-is: Spec.hs
   other-modules:
-      Paths_zamonie
+      Paths_zamonia
   hs-source-dirs:
       test
   ghc-options: -threaded -rtsopts -with-rtsopts=-N
   build-depends:
       base >=4.7 && <5
-    , zamonie
+    , zamonia
   default-language: Haskell2010

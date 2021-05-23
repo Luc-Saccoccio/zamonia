@@ -1,5 +1,5 @@
 {-# LANGUAGE OverloadedStrings #-}
-module Zamonie where
+module Zamonia where
 
 import           Data.Aeson
 import qualified Data.Text     as T
