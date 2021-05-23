@@ -1,0 +1,62 @@
+cabal-version:  2.2
+name:           zamonie
+version:        0.1.0.0
+description:    Please see the README on GitHub at <https://github.com/githubuser/zamonie#readme>
+homepage:       https://github.com/Luc-Saccoccio/zamonie
+bug-reports:    https://github.com/Luc-Saccoccio/zamonie/issues
+author:         Luc Saccoccio
+maintainer:     Luc-Saccoccio
+copyright:      2021 Luc Saccoccio
+license:        MIT
+license-file:   LICENSE
+build-type:     Simple
+extra-source-files:
+    README.md
+
+source-repository head
+  type: git
+  location: https://github.com/githubuser/zamonie
+
+library
+  exposed-modules:
+      Zamonie
+  other-modules:
+      Paths_zamonie
+  hs-source-dirs:
+      src
+  build-depends:
+      base >=4.7 && <5
+    , aeson
+    , aeson-pretty
+    , text
+    , hashmap
+  default-language: Haskell2010
+
+executable zamonie
+  main-is: Main.hs
+  other-modules:
+      Paths_zamonie
+  hs-source-dirs:
+      app
+  ghc-options: -threaded -rtsopts -with-rtsopts=-N
+  build-depends:
+      base >=4.7 && <5
+    , optparse-applicative
+    , aeson
+    , bytestring
+    , hashmap
+    , zamonie
+  default-language: Haskell2010
+
+test-suite zamonie-test
+  type: exitcode-stdio-1.0
+  main-is: Spec.hs
+  other-modules:
+      Paths_zamonie
+  hs-source-dirs:
+      test
+  ghc-options: -threaded -rtsopts -with-rtsopts=-N
+  build-depends:
+      base >=4.7 && <5
+    , zamonie
+  default-language: Haskell2010
