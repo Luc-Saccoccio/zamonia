@@ -28,6 +28,7 @@ library
       base >=4.7 && <5
     , aeson
     , aeson-pretty
+    , containers
     , text
     , hashmap
   default-language: Haskell2010
