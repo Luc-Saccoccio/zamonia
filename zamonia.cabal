@@ -27,7 +27,6 @@ library
   build-depends:
       base >=4.7 && <5
     , aeson
-    , aeson-pretty
     , containers
     , sort
     , text
@@ -43,6 +42,7 @@ executable zamonia
   build-depends:
       base >=4.7 && <5
     , optparse-applicative
+    , aeson-pretty
     , aeson
     , containers
     , bytestring

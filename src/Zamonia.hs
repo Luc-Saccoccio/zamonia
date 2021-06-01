@@ -128,11 +128,14 @@ instance Work Film where
                      "watched"       -> fwatched
 
 data Command = Add T.Text
-             | Delete T.Text
+             | Delete Int
              | Modify T.Text
-             | Search T.Text T.Text
+             | Search String T.Text -- Field then term to search
              | List 
              | Neutral deriving Show
+
+orPrint :: Either String a -> (a -> IO()) -> IO ()
+orPrint = flip (either putStrLn)
 
 serieExample :: Serie
 serieExample = Serie { stitle         = T.pack "Mob Psycho 100"

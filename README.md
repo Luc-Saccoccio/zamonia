@@ -10,7 +10,7 @@ Be a simple CLI tool to manage a JSON database full of films, series, etc inform
 
 - [ ] Fix `mzero` on `FromJSON` instances
 - [ ] Implement basic usage (add/remove)
-- [ ] Alternative to `strArgument` to parse `Int` ?
+- [ ] Add options to be able to input data for `add` and `modify` commands
 - [ ] Add completer
 - [ ] Export/Import from/to CSV
 - [ ] Enhance code ?

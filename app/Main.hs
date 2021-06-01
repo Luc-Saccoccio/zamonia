@@ -2,6 +2,7 @@ module Main where
 
 import           Control.Monad        (void)
 import           Data.Aeson
+import           Data.Aeson.Encode.Pretty
 import qualified Data.ByteString.Lazy as BS
 import qualified Data.IntMap.Lazy     as I
 import           Data.Semigroup       ((<>))
@@ -27,8 +28,8 @@ subCommands = subparser $
            <> cmd search "search" "Search keyword in list"
                where
                    add       = Add    <$> strArg "TITLE" "Title of the work you want to add"
-                   del       = Delete <$> strArg "INDEX" "Index to delete"
-                   mod       = Modify <$> strArg "INDEX" "Index to modify"
+                   del       = Delete <$> argument auto (metavar "INDEX" <> help "Index to delete, must be an integer")
+                   mod       = Modify <$> strArg "INDEX" "Index to modify, must be an integer"
                    search    = Search <$> strArg "FIELD" "In what field (e.g. title/year) the search will be done" <*> strArg "SEARCH" "Thing to search for"
                    cmd p n d = command n (info (helper <*> p) (progDesc d))
                    strArg n h  = strArgument (metavar n <> help h)
@@ -40,8 +41,7 @@ usage = subparser $
     <> command "init"  (pure Init `withInfo` "Initiate a Zamonia database")
 
 readJson :: String -> IO (Either String BS.ByteString)
-readJson list = do
-    let file = file ++ ".json"
+readJson file = do
     exist <- doesFileExist file
     if exist then
              return . Left $ printf "List %s do not exist. Please create it" file
@@ -51,19 +51,28 @@ readJson list = do
                 return $ Right content
 
 runFilms :: Command -> IO ()
-runFilms c = readJson "films" >>= either putStrLn (\rawList ->
-    do
-          let json = eitherDecode rawList :: Either String (I.IntMap Film)
-          case json of
-            Left s -> putStrLn s
-            Right list -> case c of
-                       Add _      -> return ()
-                       Delete _   -> return ()
-                       Modify _   -> return ()
-                       Search _ _ -> return ()
-                       List       -> void . sequence . listWork $ list)
+runFilms c = readJson "films.json" >>= \films ->
+    orPrint films $ \rawList ->
+        let json = eitherDecode rawList :: Either String (I.IntMap Film) in
+        orPrint json $ \list ->
+          case c of
+           Add _      -> return ()
+           Delete i   -> BS.writeFile "films.json" (encodePretty $ delWork i list)
+           Modify _   -> return ()
+           Search f t -> sequence_ . listWork . searchWork f t $ list
+           List       -> sequence_ $ listWork list
 
--- To print list of work : sequence . listWork
+runSeries :: Command -> IO ()
+runSeries c = readJson "series.json" >>= \films ->
+    orPrint films $ \rawList ->
+        let json = eitherDecode rawList :: Either String (I.IntMap Serie) in
+        orPrint json $ \list ->
+          case c of
+           Add _      -> return ()
+           Delete i   -> BS.writeFile "series.json" (encodePretty $ delWork i list)
+           Modify _   -> return ()
+           Search f t -> sequence_ . listWork . searchWork f t $ list
+           List       -> sequence_ $ listWork list
 
 main :: IO ()
 main = do
