@@ -3,20 +3,35 @@ module Zamonia where
 
 import           Data.Aeson
 import qualified Data.IntMap.Lazy as I
+import           Data.Sort
 import qualified Data.Text        as T
 import           Text.Printf
 
 class Work a where
+    fieldContent :: String -> a -> T.Text
     title :: a -> T.Text
     addWork :: a -> I.IntMap a -> I.IntMap a
+    addWork work intmap = case I.lookupMax intmap of
+                            Just (k,_) -> I.insert (k+1) work intmap
+                            Nothing    -> I.insert 0 work intmap
     delWork :: Int -> I.IntMap a -> I.IntMap a
-    modWork :: Int -> I.IntMap a -> I.IntMap a
+    delWork = I.delete
+    -- modWork :: Int -> I.IntMap a -> I.IntMap a
     listWork :: I.IntMap a -> [IO ()]
     listWork = map (putStr . snd) . I.toList . I.mapWithKey toElement
         where
             toElement :: Work w => Int -> w -> String
             toElement key w = printf "%d %s\n" key (title w)
     searchWork :: String -> T.Text -> I.IntMap a -> I.IntMap a
+    searchWork field term = I.filter (T.isInfixOf term . fieldContent field)
+    sortWork :: String -> I.IntMap a -> I.IntMap a
+    sortWork field = I.fromList . reNumber 0 . sortOn extract . I.toList
+        where
+            reNumber :: Work a => I.Key -> [(I.Key, a)] -> [(I.Key, a)]
+            reNumber _ [] = []
+            reNumber k ((_,x):xs) = reNumber (k+1) ((k,x):xs)
+            extract :: Work a => (I.Key, a) -> T.Text
+            extract = fieldContent field . snd
 
 data Serie = Serie
     { stitle         :: T.Text -- Title
@@ -59,16 +74,15 @@ instance Show Serie where
 
 instance Work Serie where
     title = stitle
-    searchWork field term = I.filter (T.isInfixOf term . fieldContent)
-        where fieldContent = case field of
-                               "title" -> title
-                               "originalTitle" -> soriginalTitle
-                               "director" -> sdirector
-                               "year" -> syear
-                               "epNumber" -> epNumber
-                               "seNumber" -> seNumber
-                               "possession" -> spossession
-                               "watched" -> swatched
+    fieldContent field = case field of
+                     "title"         -> title
+                     "originalTitle" -> soriginalTitle
+                     "director"      -> sdirector
+                     "year"          -> syear
+                     "epNumber"      -> epNumber
+                     "seNumber"      -> seNumber
+                     "possession"    -> spossession
+                     "watched"       -> swatched
 
 data Film = Film
     { ftitle         :: T.Text -- Title
@@ -105,22 +119,20 @@ instance Show Film where
 
 instance Work Film where
     title = ftitle
-    searchWork field term = I.filter (T.isInfixOf term . fieldContent)
-        where fieldContent = case term of
-                               "title" -> title
-                               "originalTitle" -> foriginalTitle
-                               "director" -> fdirector
-                               "year" -> fyear
-                               "possession" -> fpossession
-                               "watched" -> fwatched
-                               
+    fieldContent field = case field of
+                     "title"         -> title
+                     "originalTitle" -> foriginalTitle
+                     "director"      -> fdirector
+                     "year"          -> fyear
+                     "possession"    -> fpossession
+                     "watched"       -> fwatched
 
-data Command = Add T.Text T.Text
-             | Delete T.Text T.Text
-             | Modify T.Text T.Text
-             | List T.Text
-             | Search T.Text T.Text T.Text
-             | Init deriving Show
+data Command = Add T.Text
+             | Delete T.Text
+             | Modify T.Text
+             | Search T.Text T.Text
+             | List 
+             | Neutral deriving Show
 
 serieExample :: Serie
 serieExample = Serie { stitle         = T.pack "Mob Psycho 100"
