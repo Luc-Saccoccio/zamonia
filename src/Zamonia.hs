@@ -10,6 +10,7 @@ import           Text.Printf
 class Work a where
     fieldContent :: String -> a -> T.Text
     title :: a -> T.Text
+    modWork :: Int -> a -> I.IntMap a -> I.IntMap a
     addWork :: a -> I.IntMap a -> I.IntMap a
     addWork work intmap = case I.lookupMax intmap of
                             Just (k,_) -> I.insert (k+1) work intmap
@@ -127,15 +128,27 @@ instance Work Film where
                      "possession"    -> fpossession
                      "watched"       -> fwatched
 
-data Command = Add T.Text
-             | Delete Int
-             | Modify T.Text
-             | Search String T.Text -- Field then term to search
-             | List 
-             | Neutral deriving Show
+data FilmsCommand = FAdd Film
+             | FDelete Int
+             | FPrint Int
+             | FModify Int Film
+             | FSearch String T.Text -- Field then term to search
+             | FList deriving Show
+
+data SeriesCommand = SAdd Serie
+             | SDelete Int
+             | SPrint Int
+             | SModify Int Serie
+             | SSearch String T.Text
+             | SList deriving Show
 
 orPrint :: Either String a -> (a -> IO()) -> IO ()
 orPrint = flip (either putStrLn)
+
+orIndexError :: Maybe a -> (a -> IO ()) -> IO ()
+orIndexError s f = case s of
+                     Just x  -> f x
+                     Nothing -> print "Index does not exist"
 
 serieExample :: Serie
 serieExample = Serie { stitle         = T.pack "Mob Psycho 100"
