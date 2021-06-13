@@ -1,11 +1,11 @@
 {-# LANGUAGE OverloadedStrings #-}
 module Main where
 
-import           Data.Aeson
-import           Data.Aeson.Encode.Pretty
-import qualified Data.ByteString.Lazy as BS
-import           Data.IntMap.Lazy     (IntMap, (!?))
-import           Data.Semigroup       ((<>))
+import qualified Data.ByteString.Lazy     as BS
+import           Database.SQLite.Simple
+import qualified Data.Csv                 as C
+import           Data.Semigroup           ((<>))
+import           Data.Text                (Text)
 import           Options.Applicative
 import           System.Directory
 import           Text.Printf
@@ -15,9 +15,80 @@ data Usage = Init
            | Films FilmsCommand
            | Series SeriesCommand
 
-
 withInfo :: Parser a -> String -> ParserInfo a
 withInfo opts desc = info (helper <*> opts) $ progDesc desc
+
+index :: Parser Int
+index = argument auto (metavar "INDEX" <> help "Index to add")
+
+-- TODO : Probably eliminate those two
+cmd :: Parser a -> String -> String -> Mod CommandFields a
+cmd p n d = command n (info (helper <*> p) (progDesc d))
+
+-- strArg :: Data.String.IsString s => String -> String -> Parser s
+strArg n h  = strArgument (metavar n <> help h)
+
+tTitle :: Parser Text
+tTitle = strOption ( long "title"
+                <> short 't'
+                <> metavar "TITLE"
+                <> value ""
+                <> help "Title" )
+
+original :: Parser Text
+original = strOption ( long "original"
+                <> short 'o'
+                <> metavar "TITLE"
+                <> value ""
+                <> help "Original Title")
+
+director :: Parser Text
+director = strOption ( long "director"
+                <> short 'd'
+                <> metavar "DIRECTOR"
+                <> value ""
+                <> help "Director")
+
+year :: Parser Text
+year = strOption ( long "year"
+                <> short 'y'
+                <> metavar "YEAR"
+                <> value ""
+                <> help "Year of release")
+
+possession :: Parser Text
+possession = strOption ( long "possession"
+                <> short 'p'
+                <> metavar "POSSESSION"
+                <> value ""
+                <> help "Weither your possess it or not, and how")
+
+watched :: Parser Text
+watched = strOption ( long "watched"
+                <> short 'w'
+                <> metavar "WATCHED"
+                <> value ""
+                <> help "Weither you watched it or not")
+
+episodesNumber :: Parser Text
+episodesNumber = strOption ( long "episodes-number"
+                <> short 'n'
+                <> metavar "NUMBER"
+                <> value ""
+                <> help "Number of episodes")
+
+seasonsNumber :: Parser Text
+seasonsNumber = strOption ( long "seasons-number"
+                <> short 's'
+                <> metavar "NUMBER"
+                <> value ""
+                <> help "Number of seasons")
+
+importCSV :: Parser String
+importCSV = strArgument (metavar "FILE" <> help "File to Import, must be a CSV")
+
+exportJSON :: Parser String
+exportJSON = strArgument (metavar "FILE" <> help "Destination of the export")
 
 subCommandsFilms :: Parser FilmsCommand
 subCommandsFilms = subparser $
@@ -25,47 +96,22 @@ subCommandsFilms = subparser $
            <> cmd del  "delete" "Delete first matching work from list"
            <> cmd show "show" "Show informations about specified index"
            <> cmd mod  "modify" "Modify first matching work from list"
+           <> cmd imp  "import" "Import a list"
+           <> cmd exp  "export" "Export a list"
            <> command  "list" (info (pure FList) (progDesc "List entries from list"))
            <> cmd search "search" "Search keyword in list"
+           <> cmd sort "sort" "Sort the list"
                where
-                   tTitle = strOption ( long "title"
-                                        <> short 't'
-                                        <> metavar "TITLE"
-                                        <> value ""
-                                        <> help "Title" )
-                   original = strOption ( long "original"
-                                        <> short 'o'
-                                        <> metavar "TITLE"
-                                        <> value ""
-                                        <> help "Original Title")
-                   director = strOption ( long "director"
-                                        <> short 'd'
-                                        <> metavar "DIRECTOR"
-                                        <> value ""
-                                        <> help "Director")
-                   year = strOption ( long "year"
-                                        <> short 'y'
-                                        <> metavar "YEAR"
-                                        <> value ""
-                                        <> help "Year of release")
-                   possession = strOption ( long "possession"
-                                        <> short 'p'
-                                        <> metavar "POSSESSION"
-                                        <> value ""
-                                        <> help "Weither your possess it or not, and how")
-                   watched = strOption ( long "watched"
-                                        <> short 'w'
-                                        <> metavar "WATCHED"
-                                        <> value ""
-                                        <> help "Weither you watched it or not")
-                   add       = FAdd    <$> (Film <$> strArg "TITLE" "Title of the work you want to add" <*> original <*> director <*> year <*> possession <*> watched)
+                   add       = FAdd    <$> (Film <$> index <*> strArg "TITLE" "Title of the work you want to add"
+                                                    <*> original <*> director <*> year <*> possession <*> watched)
                    del       = FDelete <$> argument auto (metavar "INDEX" <> help "Index to delete, must be an integer")
-                   show      = FPrint <$> argument auto (metavar "INDEX" <> help "Index to show, must be an integer")
+                   show      = FPrint  <$> argument auto (metavar "INDEX" <> help "Index to show, must be an integer")
                    mod       = FModify <$> argument auto (metavar "INDEX" <> help "Index to modify, must be an integer")
-                                            <*> (Film <$> tTitle <*> original <*> director <*> year <*> possession <*> watched)
+                                            <*> (Film <$> index <*> tTitle <*> original <*> director <*> year <*> possession <*> watched)
+                   imp       = FImport <$> importCSV
+                   exp       = FExport <$> exportJSON
                    search    = FSearch <$> strArg "FIELD" "In what field (e.g. title/year) the search will be done" <*> strArg "SEARCH" "Thing to search for"
-                   cmd p n d = command n (info (helper <*> p) (progDesc d))
-                   strArg n h  = strArgument (metavar n <> help h)
+                   sort      = FSort <$> strArg "FIELD" "Field to search"
 
 subCommandsSeries :: Parser SeriesCommand
 subCommandsSeries = subparser $
@@ -73,101 +119,45 @@ subCommandsSeries = subparser $
            <> cmd del  "delete" "Delete first matching work from list"
            <> cmd show "show" "Show informations about specified index"
            <> cmd mod  "modify" "Modify first matching work from list"
+           <> cmd imp  "import" "Import a list"
+           <> cmd exp  "export" "Export a list"
            <> command  "list" (info (pure SList) (progDesc "List entries from list"))
            <> cmd search "search" "Search keyword in list"
+           <> cmd sort "sort" "Sort the list"
                where
-                   tTitle = strOption ( long "title"
-                                        <> short 't'
-                                        <> metavar "TITLE"
-                                        <> value ""
-                                        <> help "Title" )
-                   original = strOption ( long "original"
-                                        <> short 'o'
-                                        <> metavar "TITLE"
-                                        <> value ""
-                                        <> help "Original Title")
-                   director = strOption ( long "director"
-                                        <> short 'd'
-                                        <> metavar "DIRECTOR"
-                                        <> value ""
-                                        <> help "Director")
-                   year = strOption ( long "year"
-                                        <> short 'y'
-                                        <> metavar "YEAR"
-                                        <> value ""
-                                        <> help "Year of release")
-                   episodesNumber = strOption ( long "episodes-number"
-                                        <> short 'n'
-                                        <> metavar "NUMBER"
-                                        <> value ""
-                                        <> help "Number of episodes")
-                   seasonsNumber = strOption ( long "seasons-number"
-                                        <> short 's'
-                                        <> metavar "NUMBER"
-                                        <> value ""
-                                        <> help "Number of seasons")
-                   possession = strOption ( long "possession"
-                                        <> short 'p'
-                                        <> metavar "POSSESSION"
-                                        <> value ""
-                                        <> help "Weither your possess it or not, and how")
-                   watched = strOption ( long "watched"
-                                        <> short 'w'
-                                        <> metavar "WATCHED"
-                                        <> value ""
-                                        <> help "Weither you watched it or not")
-                   add       = SAdd    <$> (Serie <$> strArg "TITLE" "Title of the work you want to add" <*> original <*> director <*> year
-                                                        <*> episodesNumber <*> seasonsNumber <*> possession <*> watched)
+                   add       = SAdd    <$> (Serie <$> index <*> strArg "TITLE" "Title of the work you want to add"
+                                                    <*> original <*> director <*> year <*> episodesNumber <*> seasonsNumber <*> possession <*> watched)
                    del       = SDelete <$> argument auto (metavar "INDEX" <> help "Index to delete, must be an integer")
-                   show      = SPrint <$> argument auto (metavar "INDEX" <> help "Index to show, must be an integer")
+                   show      = SPrint  <$> argument auto (metavar "INDEX" <> help "Index to show, must be an integer")
                    mod       = SModify <$> argument auto (metavar "INDEX" <> help "Index to modify, must be an integer")
-                                                        <*> (Serie <$> tTitle <*> original <*> director <*> year
+                                                        <*> (Serie <$> index <*> tTitle <*> original <*> director <*> year
                                                         <*> episodesNumber <*> seasonsNumber <*> possession <*> watched)
+                   imp       = SImport <$> importCSV
+                   exp       = SExport <$> exportJSON
                    search    = SSearch <$> strArg "FIELD" "In what field (e.g. title/year) the search will be done" <*> strArg "SEARCH" "Thing to search for"
-                   cmd p n d = command n (info (helper <*> p) (progDesc d))
-                   strArg n h  = strArgument (metavar n <> help h)
+                   sort      = SSort <$> strArg "FIELD" "Field to search"
 
 usage :: Parser Usage
 usage = subparser $
-       command "film"  (Films <$> subCommandsFilms `withInfo` "Work on Film list")
+       command "film"  (Films  <$> subCommandsFilms  `withInfo` "Work on Film list")
     <> command "serie" (Series <$> subCommandsSeries `withInfo` "Work on Serie list")
     <> command "init"  (pure Init `withInfo` "Initiate a Zamonia database")
 
-readJson :: String -> IO (Either String BS.ByteString)
-readJson file = do
-    exist <- doesFileExist file
-    if exist then
-             do
-                 content <- BS.readFile file
-                 return $ Right content
-    else
-        return . Left $ printf "List %s do not exist. Please create it" file
+-- readJson :: String -> IO (Either String BS.ByteString)
+-- readJson file = do
+--     exist <- doesFileExist file
+--     if exist then
+--              do
+--                  content <- BS.readFile file
+--                  return $ Right content
+--     else
+--         return . Left $ printf "List %s do not exist. Please create it" file
 
 runFilms :: FilmsCommand -> IO ()
-runFilms c = readJson "films.json" >>= \films ->
-    orPrint films $ \rawList ->
-        let json = eitherDecode rawList :: Either String (IntMap Film) in
-        orPrint json $ \list ->
-          case c of
-           FAdd f      -> BS.writeFile "films.json" (encodePretty $ addWork f list)
-           FDelete i   -> BS.writeFile "films.json" (encodePretty $ delWork i list)
-           FPrint i    -> orIndexError (list !? i) print
-           FModify n f   -> BS.writeFile "films.json" (encodePretty $ modWork n f list)
-           FSearch f t -> sequence_ . listWork . searchWork f t $ list
-           FList       -> sequence_ $ listWork list
+runFilms c = return ()
 
 runSeries :: SeriesCommand -> IO ()
-runSeries c = readJson "series.json" >>= \films ->
-    orPrint films $ \rawList ->
-        let json = eitherDecode rawList :: Either String (IntMap Serie) in
-        orPrint json $ \list ->
-          case c of
-           SAdd s      -> BS.writeFile "series.json" (encodePretty $ addWork s list)
-           SDelete i   -> BS.writeFile "series.json" (encodePretty $ delWork i list)
-           SPrint i    -> orIndexError (list !? i) print
-           SModify n s   -> BS.writeFile "series.json" (encodePretty $ modWork n s list)
-           SSearch f t -> sequence_ . listWork . searchWork f t $ list
-           SList       -> sequence_ $ listWork list
+runSeries c = return ()
 
 main :: IO ()
 main = do
@@ -176,9 +166,8 @@ main = do
             <> progDesc "CLI personal library database"
             <> header "zamonia - a CLI personal library database written in haskell" ))
     case execution of
-      Init -> do
-          createDirectory "lists"
-          writeFile "lists/series.json" ""
-          writeFile "lists/films.json" ""
       Films c -> runFilms c
-      Series c -> return ()
+      Series c -> runSeries c
+      Init -> do
+          conn <- open "zamonia.db"
+          return ()
