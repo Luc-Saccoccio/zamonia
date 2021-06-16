@@ -1,12 +1,13 @@
 {-# LANGUAGE OverloadedStrings #-}
 module Zamonia where
 
-import           Control.Monad      (mzero)
+import           Control.Exception      (bracket)
+import           Control.Monad          (mzero)
 import           Data.Aeson
-import qualified Data.Csv           as C
-import           Database.SQLite.Simple
+import qualified Data.Csv               as C
 import           Data.Sort
-import qualified Data.Text          as T
+import qualified Data.Text              as T
+import           Database.SQLite.Simple
 import           Text.Printf
 
 class Work a where
@@ -14,7 +15,6 @@ class Work a where
     id_ :: a -> Int
     modWork :: Connection -> a -> IO ()
     addWork :: Connection -> a -> IO ()
-    addWork = undefined
 
 data Serie = Serie
     { sid            :: Int -- ID
@@ -79,6 +79,8 @@ instance Show Serie where
 instance Work Serie where
     title = stitle
     id_ = sid
+    addWork conn = execute conn "INSERT OR FAIL INTO Series VALUES\
+                                \ (?,?,?,?,?,?,?,?,?)"
 
 data Film = Film
     { fid            :: Int -- ID
@@ -136,31 +138,36 @@ instance Show Film where
 instance Work Film where
     title = ftitle
     id_ = fid
+    addWork conn = execute conn "INSERT OR FAIL INTO Films VALUES\
+                                \ (?,?,?,?,?,?,?)"
 
-data FilmsCommand = FAdd Film
-             | FDelete Int
-             | FPrint Int
-             | FModify Int Film
-             | FSearch String T.Text
-             | FImport String
-             | FExport String
-             | FSort String
-             | FList deriving Show
+delFilm :: Connection -> Int -> IO ()
+delFilm conn n = execute conn "DELETE FROM Films WHERE IdF = ?" (Only n)
 
-data SeriesCommand = SAdd Serie
-             | SDelete Int
-             | SPrint Int
-             | SModify Int Serie
-             | SSearch String T.Text
-             | SImport FilePath
-             | SExport FilePath
-             | SSort String
-             | SList deriving Show
+delSerie :: Connection -> Int -> IO ()
+delSerie conn n = execute conn "DELETE FROM Series WHERE IdS = ?" (Only n)
 
-delWork :: Connection -> Int -> IO ()
-delWork = undefined
-listWork :: Connection -> IO [String]
-listWork = undefined
+listFilms :: Connection -> IO [(Int, String)]
+listFilms conn = query_ conn "SELECT IdF, Title FROM Films"
+
+listSeries :: Connection -> IO [(Int, String)]
+listSeries conn = query_ conn "SELECT IdF, Title FROM Series"
+
+printFilm :: Connection -> Int -> IO ()
+printFilm conn n =
+    fetchFilms >>= print . head
+  where
+    fetchFilms :: IO [Film]
+    fetchFilms = queryNamed conn sql [":id" := n]
+    sql = "SELECT * FROM Films WHERE IdF = :id"
+
+printSerie :: Connection -> Int -> IO ()
+printSerie conn n =
+    fetchSeries >>= print . head
+        where
+    fetchSeries :: IO [Serie]
+    fetchSeries = queryNamed conn sql [":id" := n]
+    sql = "SELECT * FROM Series WHERE IdS = :id"
 
 orPrint :: Either String a -> (a -> IO()) -> IO ()
 orPrint = flip (either putStrLn)
@@ -169,6 +176,9 @@ orIndexError :: Maybe a -> (a -> IO ()) -> IO ()
 orIndexError s f = case s of
                      Just x  -> f x
                      Nothing -> print "Index does not exist"
+
+connection :: (Connection -> IO c) -> IO c
+connection = bracket (open "zamonia.db") close
 
 serieExample :: Serie
 serieExample = Serie { sid            = 1
@@ -189,3 +199,23 @@ filmExample = Film { fid            = 1
                    , fyear          = T.pack "1998"
                    , fpossession    = "Yes"
                    , fwatched       = "Yes" }
+
+data FilmsCommand = FAdd Film
+             | FDelete Int
+             | FPrint Int
+             | FModify Int Film
+             | FSearch String T.Text
+             | FImport String
+             | FExport String
+             | FSort String
+             | FList
+
+data SeriesCommand = SAdd Serie
+             | SDelete Int
+             | SPrint Int
+             | SModify Int Serie
+             | SSearch String T.Text
+             | SImport FilePath
+             | SExport FilePath
+             | SSort String
+             | SList

@@ -43,6 +43,7 @@ executable zamonia
   build-depends:
       base >=4.7 && <5
     , optparse-applicative
+    , sqlite-simple
     , aeson-pretty
     , aeson
     , text

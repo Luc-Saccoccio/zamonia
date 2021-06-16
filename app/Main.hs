@@ -1,11 +1,10 @@
 {-# LANGUAGE OverloadedStrings #-}
 module Main where
 
-import qualified Data.ByteString.Lazy     as BS
+import           Control.Monad          ((>=>))
+import           Data.Semigroup         ((<>))
+import           Data.Text              (Text)
 import           Database.SQLite.Simple
-import qualified Data.Csv                 as C
-import           Data.Semigroup           ((<>))
-import           Data.Text                (Text)
 import           Options.Applicative
 import           System.Directory
 import           Text.Printf
@@ -20,13 +19,6 @@ withInfo opts desc = info (helper <*> opts) $ progDesc desc
 
 index :: Parser Int
 index = argument auto (metavar "INDEX" <> help "Index to add")
-
--- TODO : Probably eliminate those two
-cmd :: Parser a -> String -> String -> Mod CommandFields a
-cmd p n d = command n (info (helper <*> p) (progDesc d))
-
--- strArg :: Data.String.IsString s => String -> String -> Parser s
-strArg n h  = strArgument (metavar n <> help h)
 
 tTitle :: Parser Text
 tTitle = strOption ( long "title"
@@ -92,50 +84,50 @@ exportJSON = strArgument (metavar "FILE" <> help "Destination of the export")
 
 subCommandsFilms :: Parser FilmsCommand
 subCommandsFilms = subparser $
-              cmd add  "add" "Add work to list"
-           <> cmd del  "delete" "Delete first matching work from list"
-           <> cmd show "show" "Show informations about specified index"
-           <> cmd mod  "modify" "Modify first matching work from list"
-           <> cmd imp  "import" "Import a list"
-           <> cmd exp  "export" "Export a list"
-           <> command  "list" (info (pure FList) (progDesc "List entries from list"))
-           <> cmd search "search" "Search keyword in list"
-           <> cmd sort "sort" "Sort the list"
+              command "add"    (info (helper <*> add) (progDesc "Add work to list"))
+           <> command "delete" (info (helper <*> del) (progDesc "Delete first matching work from list"))
+           <> command "show"   (info (helper <*> shw) (progDesc "Show informations about specified index"))
+           <> command "modify" (info (helper <*> mod) (progDesc "Modify first matching work from list"  ))
+           <> command "import" (info (helper <*> imp) (progDesc "Import a list"))
+           <> command "export" (info (helper <*> exp) (progDesc "Export a list"))
+           <> command "list"   (info (pure FList) (progDesc "List entries from list"))
+           <> command "search" (info (helper <*> search) (progDesc "Search keyword in list"))
+           <> command "sort"   (info (helper <*> sort) (progDesc "Sort the list"))
                where
-                   add       = FAdd    <$> (Film <$> index <*> strArg "TITLE" "Title of the work you want to add"
+                   add       = FAdd    <$> (Film <$> index <*> strArgument (metavar "TITLE" <> help "Title of the work you want to add")
                                                     <*> original <*> director <*> year <*> possession <*> watched)
                    del       = FDelete <$> argument auto (metavar "INDEX" <> help "Index to delete, must be an integer")
-                   show      = FPrint  <$> argument auto (metavar "INDEX" <> help "Index to show, must be an integer")
+                   shw      = FPrint  <$> argument auto (metavar "INDEX" <> help "Index to show, must be an integer")
                    mod       = FModify <$> argument auto (metavar "INDEX" <> help "Index to modify, must be an integer")
                                             <*> (Film <$> index <*> tTitle <*> original <*> director <*> year <*> possession <*> watched)
                    imp       = FImport <$> importCSV
                    exp       = FExport <$> exportJSON
-                   search    = FSearch <$> strArg "FIELD" "In what field (e.g. title/year) the search will be done" <*> strArg "SEARCH" "Thing to search for"
-                   sort      = FSort <$> strArg "FIELD" "Field to search"
+                   search    = FSearch <$> strArgument (metavar "FIELD" <> help "In what field (e.g. title/year) the search will be done") <*> strArgument (metavar "SEARCH" <> help "Thing to search for")
+                   sort      = FSort <$> strArgument (metavar "FIELD" <> help "Field to search")
 
 subCommandsSeries :: Parser SeriesCommand
 subCommandsSeries = subparser $
-              cmd add  "add" "Add work to list"
-           <> cmd del  "delete" "Delete first matching work from list"
-           <> cmd show "show" "Show informations about specified index"
-           <> cmd mod  "modify" "Modify first matching work from list"
-           <> cmd imp  "import" "Import a list"
-           <> cmd exp  "export" "Export a list"
-           <> command  "list" (info (pure SList) (progDesc "List entries from list"))
-           <> cmd search "search" "Search keyword in list"
-           <> cmd sort "sort" "Sort the list"
+              command "add"    (info (helper <*> add) (progDesc "Add work to list"))
+           <> command "delete" (info (helper <*> del) (progDesc "Delete first matching work from list"))
+           <> command "show"   (info (helper <*> shw) (progDesc "Show informations about specified index"))
+           <> command "modify" (info (helper <*> mod) (progDesc "Modify first matching work from list"))
+           <> command "import" (info (helper <*> imp) (progDesc "Import a list"))
+           <> command "export" (info (helper <*> exp) (progDesc "Export a list"))
+           <> command "list"   (info (pure SList) (progDesc "List entries from list"))
+           <> command "search" (info (helper <*> search) (progDesc "Search keyword in list"))
+           <> command "sort"   (info (helper <*> sort) (progDesc "Sort the list"))
                where
-                   add       = SAdd    <$> (Serie <$> index <*> strArg "TITLE" "Title of the work you want to add"
+                   add       = SAdd    <$> (Serie <$> index <*> strArgument (metavar "TITLE" <> help "Title of the work you want to add")
                                                     <*> original <*> director <*> year <*> episodesNumber <*> seasonsNumber <*> possession <*> watched)
                    del       = SDelete <$> argument auto (metavar "INDEX" <> help "Index to delete, must be an integer")
-                   show      = SPrint  <$> argument auto (metavar "INDEX" <> help "Index to show, must be an integer")
+                   shw      = SPrint  <$> argument auto (metavar "INDEX" <> help "Index to show, must be an integer")
                    mod       = SModify <$> argument auto (metavar "INDEX" <> help "Index to modify, must be an integer")
                                                         <*> (Serie <$> index <*> tTitle <*> original <*> director <*> year
                                                         <*> episodesNumber <*> seasonsNumber <*> possession <*> watched)
                    imp       = SImport <$> importCSV
                    exp       = SExport <$> exportJSON
-                   search    = SSearch <$> strArg "FIELD" "In what field (e.g. title/year) the search will be done" <*> strArg "SEARCH" "Thing to search for"
-                   sort      = SSort <$> strArg "FIELD" "Field to search"
+                   search    = SSearch <$> strArgument (metavar "FIELD" <> help "In what field (e.g. title/year) the search will be done") <*> strArgument (metavar "SEARCH" <> help "Thing to search for")
+                   sort      = SSort <$> strArgument (metavar "FIELD" <> help "Field to search")
 
 usage :: Parser Usage
 usage = subparser $
@@ -143,21 +135,20 @@ usage = subparser $
     <> command "serie" (Series <$> subCommandsSeries `withInfo` "Work on Serie list")
     <> command "init"  (pure Init `withInfo` "Initiate a Zamonia database")
 
--- readJson :: String -> IO (Either String BS.ByteString)
--- readJson file = do
---     exist <- doesFileExist file
---     if exist then
---              do
---                  content <- BS.readFile file
---                  return $ Right content
---     else
---         return . Left $ printf "List %s do not exist. Please create it" file
-
 runFilms :: FilmsCommand -> IO ()
-runFilms c = return ()
+runFilms (FAdd f)    = connection $ flip addWork f
+runFilms (FDelete n) = connection $ flip delFilm n
+runFilms (FPrint n)  = connection $ flip printFilm n
+runFilms FList       = connection $ listFilms >=> mapM_ (\(n, t) -> putStr $ printf "\ESC[1;32m%d\ESC[m %s\n" n t)
+runFilms c           = putStrLn "Not implemented yet"
 
 runSeries :: SeriesCommand -> IO ()
-runSeries c = return ()
+runSeries (SAdd f)    = connection $ \c -> addWork c f
+runSeries (SDelete n) = connection $ \c -> delSerie c n
+runSeries (SPrint n)  = connection $ flip printSerie n
+runSeries SList       = connection $ listSeries >=> mapM_ (\(n, t) -> putStr $ printf "\ESC[1;32m%d\ESC[m %s\n" n t)
+
+runSeries c           = putStrLn "Not implemented yet"
 
 main :: IO ()
 main = do
@@ -168,6 +159,22 @@ main = do
     case execution of
       Films c -> runFilms c
       Series c -> runSeries c
-      Init -> do
-          conn <- open "zamonia.db"
-          return ()
+      Init -> connection $ \c -> execute_ c
+                        "CREATE TABLE IF NOT EXISTS Films (IdF INTEGER PRIMARY KEY\
+                                                        \ , Title         TEXT\
+                                                        \ , OriginalTitle TEXT\
+                                                        \ , Director      TEXT\
+                                                        \ , Year          TEXT\
+                                                        \ , Possession    TEXT\
+                                                        \ , Watched       TEXT)"
+                    >> execute_ c
+                        "CREATE TABLE IF NOT EXISTS Series (IdS INTEGER PRIMARY KEY\
+                                                        \ , Title         TEXT\
+                                                        \ , OriginalTitle TEXT\
+                                                        \ , Director      TEXT\
+                                                        \ , Year          TEXT\
+                                                        \ , EpisodeNumber TEXT\
+                                                        \ , SeasonNumber  TEXT\
+                                                        \ , Possession    TEXT\
+                                                        \ , Watched       TEXT)"
+
