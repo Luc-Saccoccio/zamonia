@@ -6,26 +6,26 @@ import           Control.Monad          (mzero)
 import           Data.Aeson
 import qualified Data.Csv               as C
 import           Data.Sort
-import qualified Data.Text              as T
 import           Database.SQLite.Simple
 import           Text.Printf
 
 class Work a where
-    title :: a -> T.Text
+    title :: a -> String
     id_ :: a -> Int
-    modWork :: Connection -> a -> IO ()
+    modWork :: Connection -> Int -> a -> IO ()
     addWork :: Connection -> a -> IO ()
+    cmpWork :: a -> a -> a
 
 data Serie = Serie
     { sid            :: Int -- ID
-    , stitle         :: T.Text -- Title
-    , soriginalTitle :: T.Text -- Original Title
-    , sdirector      :: T.Text -- Director
-    , syear          :: T.Text -- Year of release
-    , epNumber       :: T.Text -- Number of episodes
-    , seNumber       :: T.Text -- Number of seasons
-    , spossession    :: T.Text -- Yes/No, Physical/Virtual (for example)
-    , swatched       :: T.Text -- Yes/No
+    , stitle         :: String -- Title
+    , soriginalTitle :: String -- Original Title
+    , sdirector      :: String -- Director
+    , syear          :: String -- Year of release
+    , epNumber       :: String -- Number of episodes
+    , seNumber       :: String -- Number of seasons
+    , spossession    :: String -- Yes/No, Physical/Virtual (for example)
+    , swatched       :: String -- Yes/No
     } deriving Eq
 
 instance FromJSON Serie where
@@ -81,15 +81,29 @@ instance Work Serie where
     id_ = sid
     addWork conn = execute conn "INSERT OR FAIL INTO Series VALUES\
                                 \ (?,?,?,?,?,?,?,?,?)"
+    cmpWork (Serie i1 t1 o1 d1 y1 e1 s1 p1 w1) (Serie i2 t2 o2 d2 y2 e2 s2 p2 w2) =
+        Serie
+            { sid = if i2 == -1 then i1 else i2
+            , stitle = compareFields t1 t2
+            , soriginalTitle = compareFields o1 o2 
+            , sdirector = compareFields d1 d2
+            , syear = compareFields y1 y2
+            , epNumber = compareFields e1 e2
+            , seNumber = compareFields s1 s2
+            , spossession = compareFields p1 p2
+            , swatched = compareFields w1 w2
+            }
+    modWork conn n s = (addWork conn . cmpWork s . head) =<<
+        (queryNamed conn "SELECT * FROM Series WHERE IdS = :id" [":id" := n] :: IO [Serie])
 
 data Film = Film
     { fid            :: Int -- ID
-    , ftitle         :: T.Text -- Title
-    , foriginalTitle :: T.Text -- Original Title
-    , fdirector      :: T.Text -- Director
-    , fyear          :: T.Text -- Year of release
-    , fpossession    :: T.Text -- Yes/No, Physical/Virtual (for example)
-    , fwatched       :: T.Text -- Yes/No
+    , ftitle         :: String -- Title
+    , foriginalTitle :: String -- Original Title
+    , fdirector      :: String -- Director
+    , fyear          :: String -- Year of release
+    , fpossession    :: String -- Yes/No, Physical/Virtual (for example)
+    , fwatched       :: String -- Yes/No
     } deriving Eq
 
 instance FromJSON Film where
@@ -140,6 +154,21 @@ instance Work Film where
     id_ = fid
     addWork conn = execute conn "INSERT OR FAIL INTO Films VALUES\
                                 \ (?,?,?,?,?,?,?)"
+    cmpWork (Film i1 t1 o1 d1 y1 p1 w1) (Film i2 t2 o2 d2 y2 p2 w2) =
+        Film
+            { fid = if i2 == -1 then i1 else i2
+            , ftitle = compareFields t1 t2
+            , foriginalTitle = compareFields o1 o2
+            , fdirector = compareFields d1 d2
+            , fyear = compareFields y1 y2
+            , fpossession = compareFields p1 p2
+            , fwatched = compareFields w1 w2
+            }
+    modWork conn n f = (addWork conn . cmpWork f . head) =<<
+        (queryNamed conn "SELECT * FROM Films WHERE IdF = :id" [":id" := n] :: IO [Film])
+
+compareFields :: String -> String -> String
+compareFields s1 s2 = if null s2 then s1 else s2
 
 delFilm :: Connection -> Int -> IO ()
 delFilm conn n = execute conn "DELETE FROM Films WHERE IdF = ?" (Only n)
@@ -182,21 +211,21 @@ connection = bracket (open "zamonia.db") close
 
 serieExample :: Serie
 serieExample = Serie { sid            = 1
-                     , stitle         = T.pack "Mob Psycho 100"
-                     , soriginalTitle = T.pack "モブサイコ100"
-                     , sdirector      = T.pack "Mobu Saiko Hyaku, Yuzuru Tachikawa"
-                     , syear          = T.pack "2019, 2019"
-                     , epNumber       = T.pack "12, 13"
-                     , seNumber       = T.pack "2"
-                     , spossession    = T.pack "Oui"
-                     , swatched       = T.pack "Oui" }
+                     , stitle         = "Mob Psycho 100"
+                     , soriginalTitle = "モブサイコ100"
+                     , sdirector      = "Mobu Saiko Hyaku, Yuzuru Tachikawa"
+                     , syear          = "2019, 2019"
+                     , epNumber       = "12, 13"
+                     , seNumber       = "2"
+                     , spossession    = "Oui"
+                     , swatched       = "Oui" }
 
 filmExample :: Film
 filmExample = Film { fid            = 1
-                   , ftitle         = T.pack "The Truman Show"
-                   , foriginalTitle = T.pack "The Truman Show"
-                   , fdirector      = T.pack "Peter Weir"
-                   , fyear          = T.pack "1998"
+                   , ftitle         = "The Truman Show"
+                   , foriginalTitle = "The Truman Show"
+                   , fdirector      = "Peter Weir"
+                   , fyear          = "1998"
                    , fpossession    = "Yes"
                    , fwatched       = "Yes" }
 
@@ -204,18 +233,16 @@ data FilmsCommand = FAdd Film
              | FDelete Int
              | FPrint Int
              | FModify Int Film
-             | FSearch String T.Text
+             | FSearch String String
              | FImport String
              | FExport String
-             | FSort String
              | FList
 
 data SeriesCommand = SAdd Serie
              | SDelete Int
              | SPrint Int
              | SModify Int Serie
-             | SSearch String T.Text
+             | SSearch String String
              | SImport FilePath
              | SExport FilePath
-             | SSort String
              | SList
