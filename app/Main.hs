@@ -1,11 +1,10 @@
 {-# LANGUAGE OverloadedStrings #-}
 module Main where
 
-import           Control.Monad          ((>=>))
-import           Data.Semigroup         ((<>))
+import           Control.Monad            ((>=>))
+import           Data.Semigroup           ((<>))
 import           Database.SQLite.Simple
 import           Options.Applicative
-import           System.Directory
 import           Text.Printf
 import           Zamonia
 
@@ -78,8 +77,11 @@ seasonsNumber = strOption ( long "seasons-number"
 importCSV :: Parser String
 importCSV = strArgument (metavar "FILE" <> help "File to Import, must be a CSV")
 
-exportJSON :: Parser String
-exportJSON = strArgument (metavar "FILE" <> help "Destination of the export")
+importJSON :: Parser String
+importJSON = strArgument (metavar "FILE" <> help "File to Import, must be a JSON")
+
+export :: Parser String
+export = strArgument (metavar "FILE" <> help "Destination of the export")
 
 subCommandsFilms :: Parser FilmsCommand
 subCommandsFilms = subparser $
@@ -87,20 +89,24 @@ subCommandsFilms = subparser $
            <> command "delete" (info (helper <*> del) (progDesc "Delete first matching work from list"))
            <> command "show"   (info (helper <*> shw) (progDesc "Show informations about specified index"))
            <> command "modify" (info (helper <*> mod) (progDesc "Modify first matching work from list"  ))
-           <> command "import" (info (helper <*> imp) (progDesc "Import a list"))
-           <> command "export" (info (helper <*> exp) (progDesc "Export a list"))
+           <> command "import-csv" (info (helper <*> imc) (progDesc "Import a list"))
+           <> command "import-json" (info (helper <*> imj) (progDesc "Import a list"))
+           <> command "export-csv" (info (helper <*> exc) (progDesc "Export a list"))
+           <> command "export-json" (info (helper <*> exj) (progDesc "Export a list"))
            <> command "list"   (info (pure FList) (progDesc "List entries from list"))
            <> command "search" (info (helper <*> search) (progDesc "Search keyword in list"))
                where
                    add       = FAdd    <$> (Film <$> index <*> strArgument (metavar "TITLE" <> help "Title of the work you want to add")
                                                     <*> original <*> director <*> year <*> possession <*> watched)
                    del       = FDelete <$> argument auto (metavar "INDEX" <> help "Index to delete, must be an integer")
-                   shw      = FPrint  <$> argument auto (metavar "INDEX" <> help "Index to show, must be an integer")
+                   shw       = FPrint  <$> argument auto (metavar "INDEX" <> help "Index to show, must be an integer")
                    mod       = FModify <$> index
-                                            <*> (Film <$> argument auto (metavar "INDEX")
+                                            <*> (Film <$> argument auto (metavar "INDEX" <> value (-1))
                                             <*> tTitle <*> original <*> director <*> year <*> possession <*> watched)
-                   imp       = FImport <$> importCSV
-                   exp       = FExport <$> exportJSON
+                   imc       = FImportCSV <$> importCSV
+                   imj       = FImportJSON <$> importJSON
+                   exc       = FExportCSV <$> export
+                   exj       = FExportJSON <$> export
                    search    = FSearch <$> strArgument (metavar "FIELD" <> help "In what field (e.g. title/year) the search will be done") <*> strArgument (metavar "SEARCH" <> help "Thing to search for")
 
 subCommandsSeries :: Parser SeriesCommand
@@ -109,20 +115,24 @@ subCommandsSeries = subparser $
            <> command "delete" (info (helper <*> del) (progDesc "Delete first matching work from list"))
            <> command "show"   (info (helper <*> shw) (progDesc "Show informations about specified index"))
            <> command "modify" (info (helper <*> mod) (progDesc "Modify first matching work from list"))
-           <> command "import" (info (helper <*> imp) (progDesc "Import a list"))
-           <> command "export" (info (helper <*> exp) (progDesc "Export a list"))
+           <> command "import-csv" (info (helper <*> imc) (progDesc "Import series from CSV"))
+           <> command "import-json" (info (helper <*> imj) (progDesc "Import series from JSON"))
+           <> command "export-csv" (info (helper <*> exc) (progDesc "Export a list"))
+           <> command "export-json" (info (helper <*> exj) (progDesc "Export a list"))
            <> command "list"   (info (pure SList) (progDesc "List entries from list"))
            <> command "search" (info (helper <*> search) (progDesc "Search keyword in list"))
                where
                    add       = SAdd    <$> (Serie <$> index <*> strArgument (metavar "TITLE" <> help "Title of the work you want to add")
                                                     <*> original <*> director <*> year <*> episodesNumber <*> seasonsNumber <*> possession <*> watched)
                    del       = SDelete <$> argument auto (metavar "INDEX" <> help "Index to delete, must be an integer")
-                   shw      = SPrint  <$> argument auto (metavar "INDEX" <> help "Index to show, must be an integer")
+                   shw       = SPrint  <$> argument auto (metavar "INDEX" <> help "Index to show, must be an integer")
                    mod       = SModify <$> index
-                                        <*> (Serie <$> argument auto (metavar "INDEX") <*> tTitle <*> original <*> director <*> year
+                                        <*> (Serie <$> argument auto (metavar "INDEX" <> value (-1)) <*> tTitle <*> original <*> director <*> year
                                                         <*> episodesNumber <*> seasonsNumber <*> possession <*> watched)
-                   imp       = SImport <$> importCSV
-                   exp       = SExport <$> exportJSON
+                   imc       = SImportCSV <$> importCSV
+                   imj       = SImportJSON <$> importJSON
+                   exc       = SExportCSV <$> export
+                   exj       = SExportJSON <$> export
                    search    = SSearch <$> strArgument (metavar "FIELD" <> help "In what field (e.g. title/year) the search will be done") <*> strArgument (metavar "SEARCH" <> help "Thing to search for")
 
 usage :: Parser Usage
@@ -136,6 +146,10 @@ runFilms (FAdd f)    = connection $ flip addWork f
 runFilms (FDelete n) = connection $ flip delFilm n
 runFilms (FPrint n)  = connection $ flip printFilm n
 runFilms (FModify n f) = connection $ \c -> modWork c n f
+runFilms (FImportJSON f) = connection $ flip importFilmsJSON f
+runFilms (FImportCSV f) = connection $ flip importFilmsCSV f
+runFilms (FExportJSON f) = connection $ flip exportFilmsJSON f
+runFilms (FExportCSV f) = connection $ flip exportFilmsCSV f
 runFilms FList       = connection $ listFilms >=> mapM_ (\(n, t) -> putStr $ printf "\ESC[1;32m%d\ESC[m %s\n" n t)
 runFilms c           = putStrLn "Not implemented yet"
 
@@ -144,8 +158,11 @@ runSeries (SAdd f)    = connection $ \c -> addWork c f
 runSeries (SDelete n) = connection $ \c -> delSerie c n
 runSeries (SPrint n)  = connection $ flip printSerie n
 runSeries (SModify n s) = connection $ \c -> modWork c n s
+runSeries (SImportJSON f) = connection $ flip importSeriesJSON f
+runSeries (SImportCSV f) = connection $ flip importSeriesCSV f
+runSeries (SExportJSON f) = connection $ flip exportSeriesJSON f
+runSeries (SExportCSV f) = connection $ flip exportSeriesCSV f
 runSeries SList       = connection $ listSeries >=> mapM_ (\(n, t) -> putStr $ printf "\ESC[1;32m%d\ESC[m %s\n" n t)
-
 runSeries c           = putStrLn "Not implemented yet"
 
 main :: IO ()

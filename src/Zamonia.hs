@@ -1,11 +1,36 @@
 {-# LANGUAGE OverloadedStrings #-}
-module Zamonia where
+module Zamonia
+    ( FilmsCommand(..)
+    , SeriesCommand(..)
+    , Film(..)
+    , Serie(..)
+    , connection
+    , listFilms
+    , listSeries
+    , addWork
+    , delFilm
+    , delSerie
+    , printFilm
+    , printSerie
+    , modWork
+    , importSeriesCSV
+    , importFilmsCSV
+    , importSeriesJSON
+    , importFilmsJSON
+    , exportSeriesCSV
+    , exportSeriesJSON
+    , exportFilmsCSV
+    , exportFilmsJSON)
+    where
 
 import           Control.Exception      (bracket)
-import           Control.Monad          (mzero)
+import           Control.Monad          (mzero, (>=>), (<=<))
 import           Data.Aeson
+import           Data.Aeson.Encode.Pretty (encodePretty)
+import qualified Data.ByteString.Lazy   as BS
 import qualified Data.Csv               as C
 import           Data.Sort
+import           Data.Vector            (Vector)
 import           Database.SQLite.Simple
 import           Text.Printf
 
@@ -79,13 +104,13 @@ instance Show Serie where
 instance Work Serie where
     title = stitle
     id_ = sid
-    addWork conn = execute conn "INSERT OR FAIL INTO Series VALUES\
+    addWork conn = execute conn "INSERT OR REPLACE INTO Series VALUES\
                                 \ (?,?,?,?,?,?,?,?,?)"
     cmpWork (Serie i1 t1 o1 d1 y1 e1 s1 p1 w1) (Serie i2 t2 o2 d2 y2 e2 s2 p2 w2) =
         Serie
             { sid = if i2 == -1 then i1 else i2
             , stitle = compareFields t1 t2
-            , soriginalTitle = compareFields o1 o2 
+            , soriginalTitle = compareFields o1 o2
             , sdirector = compareFields d1 d2
             , syear = compareFields y1 y2
             , epNumber = compareFields e1 e2
@@ -152,7 +177,7 @@ instance Show Film where
 instance Work Film where
     title = ftitle
     id_ = fid
-    addWork conn = execute conn "INSERT OR FAIL INTO Films VALUES\
+    addWork conn = execute conn "INSERT OR REPLACE INTO Films VALUES\
                                 \ (?,?,?,?,?,?,?)"
     cmpWork (Film i1 t1 o1 d1 y1 p1 w1) (Film i2 t2 o2 d2 y2 p2 w2) =
         Film
@@ -201,13 +226,44 @@ printSerie conn n =
 orPrint :: Either String a -> (a -> IO()) -> IO ()
 orPrint = flip (either putStrLn)
 
-orIndexError :: Maybe a -> (a -> IO ()) -> IO ()
-orIndexError s f = case s of
-                     Just x  -> f x
-                     Nothing -> print "Index does not exist"
-
 connection :: (Connection -> IO c) -> IO c
 connection = bracket (open "zamonia.db") close
+
+importFilmsJSON :: Connection -> FilePath -> IO ()
+importFilmsJSON conn = BS.readFile >=> \j -> orPrint (eitherDecode j :: Either String [Film])
+                        $ mapM_ (addWork conn)
+
+importSeriesJSON :: Connection -> FilePath -> IO ()
+importSeriesJSON conn = BS.readFile >=> \j -> orPrint (eitherDecode j :: Either String [Serie])
+                        $ mapM_ (addWork conn)
+
+importFilmsCSV :: Connection -> FilePath -> IO ()
+importFilmsCSV conn = BS.readFile >=> \c -> orPrint (C.decode C.HasHeader c :: Either String (Vector Film))
+                        $ mapM_ (addWork conn)
+
+importSeriesCSV :: Connection -> FilePath -> IO ()
+importSeriesCSV conn = BS.readFile >=> \c -> orPrint (C.decode C.HasHeader c :: Either String (Vector Serie))
+                        $ mapM_ (addWork conn)
+
+exportFilmsJSON :: Connection -> FilePath -> IO ()
+exportFilmsJSON conn file = BS.writeFile file . encodePretty =<< films
+    where
+        films = query_ conn "SELECT * FROM Films" :: IO [Film]
+
+exportSeriesJSON :: Connection -> FilePath -> IO ()
+exportSeriesJSON conn file = BS.writeFile file . encodePretty =<< series
+    where
+        series = query_ conn "SELECT * FROM Series" :: IO [Serie]
+
+exportFilmsCSV :: Connection -> FilePath -> IO ()
+exportFilmsCSV conn file = BS.writeFile file . C.encode =<< films
+    where
+        films = query_ conn "SELECT * FROM Films" :: IO [Film]
+
+exportSeriesCSV :: Connection -> FilePath -> IO ()
+exportSeriesCSV conn file = BS.writeFile file . C.encode =<< series
+    where
+        series = query_ conn "SELECT * FROM Series" :: IO [Serie]
 
 serieExample :: Serie
 serieExample = Serie { sid            = 1
@@ -234,8 +290,10 @@ data FilmsCommand = FAdd Film
              | FPrint Int
              | FModify Int Film
              | FSearch String String
-             | FImport String
-             | FExport String
+             | FImportCSV FilePath
+             | FImportJSON FilePath
+             | FExportJSON FilePath
+             | FExportCSV FilePath
              | FList
 
 data SeriesCommand = SAdd Serie
@@ -243,6 +301,8 @@ data SeriesCommand = SAdd Serie
              | SPrint Int
              | SModify Int Serie
              | SSearch String String
-             | SImport FilePath
-             | SExport FilePath
+             | SImportCSV FilePath
+             | SImportJSON FilePath
+             | SExportJSON FilePath
+             | SExportCSV FilePath
              | SList
