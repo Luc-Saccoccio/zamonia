@@ -1,10 +1,11 @@
 {-# LANGUAGE OverloadedStrings #-}
 module Main where
 
-import           Control.Monad            ((>=>))
-import           Data.Semigroup           ((<>))
+import           Control.Monad          ((>=>))
+import           Data.Semigroup         ((<>))
 import           Database.SQLite.Simple
 import           Options.Applicative
+import           System.Directory       (createDirectoryIfMissing)
 import           Text.Printf
 import           Zamonia
 
@@ -74,10 +75,20 @@ seasonsNumber = strOption ( long "seasons-number"
                 <> value ""
                 <> help "Number of seasons")
 
-importCSV :: Parser String
+sortNames :: Parser Sort
+sortNames = flag Ids Names ( long "names"
+            <> short 'n'
+            <> help "Sort by names and not by ID")
+
+sortWatched :: Parser Sort
+sortWatched = flag Ids Watched ( long "watched"
+            <> short 'w'
+            <> help "Sort by watching and not by ID")
+
+importCSV :: Parser FilePath
 importCSV = strArgument (metavar "FILE" <> help "File to Import, must be a CSV")
 
-importJSON :: Parser String
+importJSON :: Parser FilePath
 importJSON = strArgument (metavar "FILE" <> help "File to Import, must be a JSON")
 
 export :: Parser String
@@ -85,18 +96,19 @@ export = strArgument (metavar "FILE" <> help "Destination of the export")
 
 subCommandsFilms :: Parser FilmsCommand
 subCommandsFilms = subparser $
-              command "add"    (info (helper <*> add) (progDesc "Add work to list"))
-           <> command "delete" (info (helper <*> del) (progDesc "Delete first matching work from list"))
+              command "add"    (info (helper <*> add) (progDesc "Add film to the database"))
+           <> command "delete" (info (helper <*> del) (progDesc "Delete first matching film from database"))
            <> command "show"   (info (helper <*> shw) (progDesc "Show informations about specified index"))
-           <> command "modify" (info (helper <*> mod) (progDesc "Modify first matching work from list"  ))
-           <> command "import-csv" (info (helper <*> imc) (progDesc "Import a list"))
-           <> command "import-json" (info (helper <*> imj) (progDesc "Import a list"))
-           <> command "export-csv" (info (helper <*> exc) (progDesc "Export a list"))
-           <> command "export-json" (info (helper <*> exj) (progDesc "Export a list"))
-           <> command "list"   (info (pure FList) (progDesc "List entries from list"))
-           <> command "search" (info (helper <*> search) (progDesc "Search keyword in list"))
+           <> command "modify" (info (helper <*> mod) (progDesc "Modify first matching film from database"))
+           <> command "import-csv" (info (helper <*> imc) (progDesc "Import a list from CSV"))
+           <> command "import-json" (info (helper <*> imj) (progDesc "Import a list from JSON"))
+           <> command "export-csv" (info (helper <*> exc) (progDesc "Export a list to CSV"))
+           <> command "export-json" (info (helper <*> exj) (progDesc "Export a list to JSON"))
+           <> command "list"   (info (helper <*> lis) (progDesc "List entries from database"))
+           <> command "purge"  (info (pure FPurge) (progDesc "Purge all rows from table in database"))
+           <> command "search" (info (helper <*> search) (progDesc "Search keyword in database"))
                where
-                   add       = FAdd    <$> (Film <$> index <*> strArgument (metavar "TITLE" <> help "Title of the work you want to add")
+                   add       = FAdd    <$> (Film <$> index <*> strArgument (metavar "TITLE" <> help "Title of the film you want to add")
                                                     <*> original <*> director <*> year <*> possession <*> watched)
                    del       = FDelete <$> argument auto (metavar "INDEX" <> help "Index to delete, must be an integer")
                    shw       = FPrint  <$> argument auto (metavar "INDEX" <> help "Index to show, must be an integer")
@@ -107,22 +119,24 @@ subCommandsFilms = subparser $
                    imj       = FImportJSON <$> importJSON
                    exc       = FExportCSV <$> export
                    exj       = FExportJSON <$> export
+                   lis       = FList <$> liftA2 (<~>) sortNames sortWatched
                    search    = FSearch <$> strArgument (metavar "FIELD" <> help "In what field (e.g. title/year) the search will be done") <*> strArgument (metavar "SEARCH" <> help "Thing to search for")
 
 subCommandsSeries :: Parser SeriesCommand
 subCommandsSeries = subparser $
-              command "add"    (info (helper <*> add) (progDesc "Add work to list"))
-           <> command "delete" (info (helper <*> del) (progDesc "Delete first matching work from list"))
+              command "add"    (info (helper <*> add) (progDesc "Add serie to the database"))
+           <> command "delete" (info (helper <*> del) (progDesc "Delete first matching serie from database"))
            <> command "show"   (info (helper <*> shw) (progDesc "Show informations about specified index"))
-           <> command "modify" (info (helper <*> mod) (progDesc "Modify first matching work from list"))
+           <> command "modify" (info (helper <*> mod) (progDesc "Modify first matching film from database"))
            <> command "import-csv" (info (helper <*> imc) (progDesc "Import series from CSV"))
            <> command "import-json" (info (helper <*> imj) (progDesc "Import series from JSON"))
-           <> command "export-csv" (info (helper <*> exc) (progDesc "Export a list"))
-           <> command "export-json" (info (helper <*> exj) (progDesc "Export a list"))
-           <> command "list"   (info (pure SList) (progDesc "List entries from list"))
-           <> command "search" (info (helper <*> search) (progDesc "Search keyword in list"))
+           <> command "export-csv" (info (helper <*> exc) (progDesc "Export a list to CSV"))
+           <> command "export-json" (info (helper <*> exj) (progDesc "Export a list to JSON"))
+           <> command "list"   (info (helper <*> lis) (progDesc "List entries from database"))
+           <> command "purge"  (info (pure SPurge) (progDesc "Purge all rows from table in database"))
+           <> command "search" (info (helper <*> search) (progDesc "Search keyword in database"))
                where
-                   add       = SAdd    <$> (Serie <$> index <*> strArgument (metavar "TITLE" <> help "Title of the work you want to add")
+                   add       = SAdd    <$> (Serie <$> index <*> strArgument (metavar "TITLE" <> help "Title of the serie you want to add")
                                                     <*> original <*> director <*> year <*> episodesNumber <*> seasonsNumber <*> possession <*> watched)
                    del       = SDelete <$> argument auto (metavar "INDEX" <> help "Index to delete, must be an integer")
                    shw       = SPrint  <$> argument auto (metavar "INDEX" <> help "Index to show, must be an integer")
@@ -133,6 +147,7 @@ subCommandsSeries = subparser $
                    imj       = SImportJSON <$> importJSON
                    exc       = SExportCSV <$> export
                    exj       = SExportJSON <$> export
+                   lis       = SList <$> liftA2 (<~>) sortNames sortWatched
                    search    = SSearch <$> strArgument (metavar "FIELD" <> help "In what field (e.g. title/year) the search will be done") <*> strArgument (metavar "SEARCH" <> help "Thing to search for")
 
 usage :: Parser Usage
@@ -150,7 +165,8 @@ runFilms (FImportJSON f) = connection $ flip importFilmsJSON f
 runFilms (FImportCSV f) = connection $ flip importFilmsCSV f
 runFilms (FExportJSON f) = connection $ flip exportFilmsJSON f
 runFilms (FExportCSV f) = connection $ flip exportFilmsCSV f
-runFilms FList       = connection $ listFilms >=> mapM_ (\(n, t) -> putStr $ printf "\ESC[1;32m%d\ESC[m %s\n" n t)
+runFilms (FList s)      = connection $ listFilms s >=> mapM_ (\(n, w, t) -> putStr $ printf "\ESC[1;32m%d\ESC[m\t\ESC[1;35m%s\ESC[m\t%s\n" n w t)
+runFilms FPurge = connection purgeFilms
 runFilms c           = putStrLn "Not implemented yet"
 
 runSeries :: SeriesCommand -> IO ()
@@ -162,7 +178,8 @@ runSeries (SImportJSON f) = connection $ flip importSeriesJSON f
 runSeries (SImportCSV f) = connection $ flip importSeriesCSV f
 runSeries (SExportJSON f) = connection $ flip exportSeriesJSON f
 runSeries (SExportCSV f) = connection $ flip exportSeriesCSV f
-runSeries SList       = connection $ listSeries >=> mapM_ (\(n, t) -> putStr $ printf "\ESC[1;32m%d\ESC[m %s\n" n t)
+runSeries (SList s)       = connection $ listSeries s >=> mapM_ (\(n, w, t) -> putStr $ printf "\ESC[1;32m%d\ESC[m\t\ESC[1;35m%s\ESC[m\t%s\n" n w t)
+runSeries SPurge = connection purgeSeries
 runSeries c           = putStrLn "Not implemented yet"
 
 main :: IO ()
@@ -174,7 +191,9 @@ main = do
     case execution of
       Films c -> runFilms c
       Series c -> runSeries c
-      Init -> connection $ \c -> execute_ c
+      Init ->
+          localLocation >>= createDirectoryIfMissing True
+                    >> connection (\c -> execute_ c
                         "CREATE TABLE IF NOT EXISTS Films (IdF INTEGER PRIMARY KEY\
                                                         \ , Title         TEXT\
                                                         \ , OriginalTitle TEXT\
@@ -191,4 +210,4 @@ main = do
                                                         \ , EpisodeNumber TEXT\
                                                         \ , SeasonNumber  TEXT\
                                                         \ , Possession    TEXT\
-                                                        \ , Watched       TEXT)"
+                                                        \ , Watched       TEXT)")

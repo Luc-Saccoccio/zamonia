@@ -4,6 +4,9 @@ module Zamonia
     , SeriesCommand(..)
     , Film(..)
     , Serie(..)
+    , Sort(..)
+    , (<~>)
+    , localLocation
     , connection
     , listFilms
     , listSeries
@@ -20,37 +23,47 @@ module Zamonia
     , exportSeriesCSV
     , exportSeriesJSON
     , exportFilmsCSV
-    , exportFilmsJSON)
+    , exportFilmsJSON
+    , purgeFilms
+    , purgeSeries)
     where
 
-import           Control.Exception      (bracket)
-import           Control.Monad          (mzero, (>=>), (<=<))
+import           Control.Exception        (bracket)
+import           Control.Monad            (mzero, (<=<), (>=>))
 import           Data.Aeson
 import           Data.Aeson.Encode.Pretty (encodePretty)
-import qualified Data.ByteString.Lazy   as BS
-import qualified Data.Csv               as C
+import qualified Data.ByteString.Lazy     as BS
+import qualified Data.Csv                 as C
+import           Data.Functor             ((<&>))
 import           Data.Sort
-import           Data.Vector            (Vector)
+import           Data.Vector              (Vector)
 import           Database.SQLite.Simple
+import           System.Environment       (getEnv)
 import           Text.Printf
 
-class Work a where
-    title :: a -> String
-    id_ :: a -> Int
-    modWork :: Connection -> Int -> a -> IO ()
-    addWork :: Connection -> a -> IO ()
-    cmpWork :: a -> a -> a
+localLocation :: IO FilePath
+localLocation = getEnv "HOME" <&> (++ "/.local/share/zamonia")
 
-data Serie = Serie
-    { sid            :: Int -- ID
-    , stitle         :: String -- Title
-    , soriginalTitle :: String -- Original Title
-    , sdirector      :: String -- Director
-    , syear          :: String -- Year of release
-    , epNumber       :: String -- Number of episodes
-    , seNumber       :: String -- Number of seasons
-    , spossession    :: String -- Yes/No, Physical/Virtual (for example)
-    , swatched       :: String -- Yes/No
+databaseLocation :: IO FilePath
+databaseLocation = localLocation <&> (++ "/zamonia.db")
+
+class Work a where
+    title :: a -> String -- ^ Title of the work
+    id_ :: a -> Int -- ^ ID of the work
+    modWork :: Connection -> Int -> a -> IO () -- ^ Modifying the informations of a work
+    addWork :: Connection -> a -> IO () -- ^ Adding a work
+    cmpWork :: a -> a -> a -- ^ Comparing two works
+
+data Serie = Serie -- ^ Structure representing a serie
+    { sid            :: Int    -- ^ ID
+    , stitle         :: String -- ^ Title
+    , soriginalTitle :: String -- ^ Original Title
+    , sdirector      :: String -- ^ Director
+    , syear          :: String -- ^ Year of release
+    , epNumber       :: String -- ^ Number of episodes
+    , seNumber       :: String -- ^ Number of seasons
+    , spossession    :: String -- ^ Yes/No, Physical/Virtual (for example)
+    , swatched       :: String -- ^ Yes/No
     } deriving Eq
 
 instance FromJSON Serie where
@@ -121,14 +134,14 @@ instance Work Serie where
     modWork conn n s = (addWork conn . cmpWork s . head) =<<
         (queryNamed conn "SELECT * FROM Series WHERE IdS = :id" [":id" := n] :: IO [Serie])
 
-data Film = Film
-    { fid            :: Int -- ID
-    , ftitle         :: String -- Title
-    , foriginalTitle :: String -- Original Title
-    , fdirector      :: String -- Director
-    , fyear          :: String -- Year of release
-    , fpossession    :: String -- Yes/No, Physical/Virtual (for example)
-    , fwatched       :: String -- Yes/No
+data Film = Film -- ^ Structure representing a film
+    { fid            :: Int    -- ^ ID
+    , ftitle         :: String -- ^ Title
+    , foriginalTitle :: String -- ^ Original Title
+    , fdirector      :: String -- ^ Director
+    , fyear          :: String -- ^ Year of release
+    , fpossession    :: String -- ^ Yes/No, Physical/Virtual (for example)
+    , fwatched       :: String -- ^ Yes/No
     } deriving Eq
 
 instance FromJSON Film where
@@ -201,11 +214,21 @@ delFilm conn n = execute conn "DELETE FROM Films WHERE IdF = ?" (Only n)
 delSerie :: Connection -> Int -> IO ()
 delSerie conn n = execute conn "DELETE FROM Series WHERE IdS = ?" (Only n)
 
-listFilms :: Connection -> IO [(Int, String)]
-listFilms conn = query_ conn "SELECT IdF, Title FROM Films"
+listFilms :: Sort -> Connection -> IO [(Int, String, String)]
+listFilms s conn = query_ conn sql
+    where
+        sql = case s of
+                Names -> "SELECT IdF, Watched, Title FROM Films ORDER BY Title"
+                Watched -> "SELECT IdF, Watched, Title FROM Films ORDER BY Watched"
+                Ids -> "SELECT IdF, Watched, Title FROM Films"
 
-listSeries :: Connection -> IO [(Int, String)]
-listSeries conn = query_ conn "SELECT IdF, Title FROM Series"
+listSeries :: Sort -> Connection -> IO [(Int, String, String)]
+listSeries s conn = query_ conn sql
+    where
+        sql = case s of
+                Names -> "SELECT IdS, Watched, Title FROM Series ORDER BY Title"
+                Watched -> "SELECT IdS, Watched, Title FROM Series ORDER BY Watched"
+                Ids -> "SELECT IdS, Watched, Title FROM Series"
 
 printFilm :: Connection -> Int -> IO ()
 printFilm conn n =
@@ -226,66 +249,79 @@ printSerie conn n =
 orPrint :: Either String a -> (a -> IO()) -> IO ()
 orPrint = flip (either putStrLn)
 
+-- | Trying to open a database and returning the Connection.
+-- It takes a function. If the function fails, connection closes the connection to the database.
 connection :: (Connection -> IO c) -> IO c
-connection = bracket (open "zamonia.db") close
+connection = bracket (open =<< databaseLocation) close
 
+-- | Read the specified file, try to decode it. If it fails, print the error.
+-- If it didn't fail, add each work to the database.
 importFilmsJSON :: Connection -> FilePath -> IO ()
 importFilmsJSON conn = BS.readFile >=> \j -> orPrint (eitherDecode j :: Either String [Film])
                         $ mapM_ (addWork conn)
 
+-- | Read the specified file, try to decode it. If it fails, print the error.
+-- If it didn't fail, add each work to the database.
 importSeriesJSON :: Connection -> FilePath -> IO ()
 importSeriesJSON conn = BS.readFile >=> \j -> orPrint (eitherDecode j :: Either String [Serie])
                         $ mapM_ (addWork conn)
 
+-- | Read the specified file, try to decode it. If it fails, print the error.
+-- If it didn't fail, add each work to the database.
 importFilmsCSV :: Connection -> FilePath -> IO ()
 importFilmsCSV conn = BS.readFile >=> \c -> orPrint (C.decode C.HasHeader c :: Either String (Vector Film))
                         $ mapM_ (addWork conn)
 
+-- | Read the specified file, try to decode it. If it fails, print the error.
+-- If it didn't fail, add each work to the database.
 importSeriesCSV :: Connection -> FilePath -> IO ()
 importSeriesCSV conn = BS.readFile >=> \c -> orPrint (C.decode C.HasHeader c :: Either String (Vector Serie))
                         $ mapM_ (addWork conn)
 
+-- | Query the films, encode them and write them to the specified file.
 exportFilmsJSON :: Connection -> FilePath -> IO ()
 exportFilmsJSON conn file = BS.writeFile file . encodePretty =<< films
     where
         films = query_ conn "SELECT * FROM Films" :: IO [Film]
 
+-- | Query the series, encode them and write them to the specified file.
 exportSeriesJSON :: Connection -> FilePath -> IO ()
 exportSeriesJSON conn file = BS.writeFile file . encodePretty =<< series
     where
         series = query_ conn "SELECT * FROM Series" :: IO [Serie]
 
+-- | Query the films, encode them and write them to the specified file.
 exportFilmsCSV :: Connection -> FilePath -> IO ()
 exportFilmsCSV conn file = BS.writeFile file . C.encode =<< films
     where
         films = query_ conn "SELECT * FROM Films" :: IO [Film]
 
+-- | Query the series, encode them and write them to the specified file.
 exportSeriesCSV :: Connection -> FilePath -> IO ()
 exportSeriesCSV conn file = BS.writeFile file . C.encode =<< series
     where
         series = query_ conn "SELECT * FROM Series" :: IO [Serie]
 
-serieExample :: Serie
-serieExample = Serie { sid            = 1
-                     , stitle         = "Mob Psycho 100"
-                     , soriginalTitle = "モブサイコ100"
-                     , sdirector      = "Mobu Saiko Hyaku, Yuzuru Tachikawa"
-                     , syear          = "2019, 2019"
-                     , epNumber       = "12, 13"
-                     , seNumber       = "2"
-                     , spossession    = "Oui"
-                     , swatched       = "Oui" }
+purgeFilms :: Connection -> IO ()
+purgeFilms conn = execute_ conn "DELETE FROM Films"
 
-filmExample :: Film
-filmExample = Film { fid            = 1
-                   , ftitle         = "The Truman Show"
-                   , foriginalTitle = "The Truman Show"
-                   , fdirector      = "Peter Weir"
-                   , fyear          = "1998"
-                   , fpossession    = "Yes"
-                   , fwatched       = "Yes" }
+purgeSeries :: Connection -> IO ()
+purgeSeries conn = execute_ conn "DELETE FROM Series"
 
-data FilmsCommand = FAdd Film
+-- | Types of sort
+data Sort = Ids
+          | Names
+          | Watched
+
+-- | Select sort
+(<~>) :: Sort -> Sort -> Sort
+(<~>) _ Names = Names
+(<~>) _ Watched = Watched
+(<~>) a Ids = a
+
+-- | Commands related to films
+data FilmsCommand =
+            FAdd Film
              | FDelete Int
              | FPrint Int
              | FModify Int Film
@@ -294,9 +330,12 @@ data FilmsCommand = FAdd Film
              | FImportJSON FilePath
              | FExportJSON FilePath
              | FExportCSV FilePath
-             | FList
+             | FList Sort
+             | FPurge
 
-data SeriesCommand = SAdd Serie
+-- | Commands related to series
+data SeriesCommand =
+            SAdd Serie
              | SDelete Int
              | SPrint Int
              | SModify Int Serie
@@ -305,4 +344,5 @@ data SeriesCommand = SAdd Serie
              | SImportJSON FilePath
              | SExportJSON FilePath
              | SExportCSV FilePath
-             | SList
+             | SList Sort
+             | SPurge

@@ -32,11 +32,16 @@ There is 10 subcommands :
 - `list` : List all the works by index and title.
 - `search` : Not implemented yet.
 
+### Completions
+
+You can activate completions by executing
+```
+$ source <(zamonia --bash-completion-script `which zamonia`)
+```
+
 ## TODO
 
-- [ ] Add completer
 - [ ] Add Search
-- [ ] Relocate the database from local directory to `~/.local/zamonia/zamonia.db`
-- [ ] Add a `purge` command to purge the database
+- [ ] Add support for books and video games
 - [ ] Make a package for the AUR
 - [ ] Enhance and **document** the code
