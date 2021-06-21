@@ -7,7 +7,10 @@ Using `stack`:
 stack install
 ```
 
-An `AUR` package is planned.
+If you are using Arch, you can install the AUR package `zamonia-bin` e.g. :
+```
+yay -S zamonia-bin
+```
 
 ## Usage
 
@@ -43,5 +46,4 @@ $ source <(zamonia --bash-completion-script `which zamonia`)
 
 - [ ] Add Search
 - [ ] Add support for books and video games
-- [ ] Make a package for the AUR
 - [ ] Enhance and **document** the code
