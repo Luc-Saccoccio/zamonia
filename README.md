@@ -46,5 +46,6 @@ $ source <(zamonia --bash-completion-script `which zamonia`)
 ## TODO
 
 - [ ] Add Search
+- [ ] Rename each `serie` to `series` becuasse I'm bade at anglishe :'(
 - [ ] Add support for books and video games
 - [ ] Write documentation for `export-tex`
