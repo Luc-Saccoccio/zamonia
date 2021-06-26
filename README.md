@@ -25,7 +25,7 @@ The tool has 3 main commands, and multiple subcommands :
 
 All the subcommands are the same for `film` and `serie`. Only optional arguments are different, they are listed in each subcommand help.
 
-There is 10 subcommands :
+There is 11 subcommands :
 - `add` : Add a work to the database, takes an index and a title. All other informations are optional.
 - `delete` : Delete a work from the database, takes an index.
 - `show` : Print informations related to a work, takes an index.
@@ -48,4 +48,3 @@ $ source <(zamonia --bash-completion-script `which zamonia`)
 - [ ] Add Search
 - [ ] Add support for books and video games
 - [ ] Write documentation for `export-tex`
-- [ ] Enhance and **document** the code
