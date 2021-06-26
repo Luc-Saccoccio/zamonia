@@ -22,8 +22,8 @@ module Zamonia
     , importFilmsJSON
     , exportSeriesCSV
     , exportSeriesJSON
-    , serieToFullTex
-    , filmsToFullTex
+    , serieToFullFormatted
+    , filmsToFullFormatted
     , exportFilmsCSV
     , exportFilmsJSON
     , purgeFilms

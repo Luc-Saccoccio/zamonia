@@ -32,6 +32,7 @@ There is 10 subcommands :
 - `modify` : Modify a work, takes an index, all modified fields are optional. Using this without any optional argument lead to no change.
 - `import-csv`/`import-json` : Import a database from a headerless (to discuss) CSV/JSON file.
 - `export-csv`/`export-json` : Import a database to a headerless (to discuss) CSV/JSON file.
+- `export-tex`: Export a table to a document. Altough the command indicate TeX, the template can be in any markup language. See the section.
 - `list` : List all the works by index and title.
 - `search` : Not implemented yet.
 
@@ -46,5 +47,5 @@ $ source <(zamonia --bash-completion-script `which zamonia`)
 
 - [ ] Add Search
 - [ ] Add support for books and video games
-- [ ] Add export (only) to LaTeX. The idea is to be able to reference each entry in a PDF.
+- [ ] Write documentation for `export-tex`
 - [ ] Enhance and **document** the code

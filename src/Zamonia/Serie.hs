@@ -9,6 +9,7 @@ import qualified Data.Csv                 as C
 import           Data.Vector              (Vector)
 import           Database.SQLite.Simple
 import           Text.Printf
+import           Text.Replace
 import           Zamonia.Work
 
 
@@ -35,10 +36,11 @@ data SeriesCommand =
              | SImportJSON FilePath
              | SExportJSON FilePath
              | SExportCSV FilePath
-             | SExportFullTex FilePath FilePath
+             | SExportFormatted FilePath FilePath
              | SList Sort
              | SPurge
 
+-- | Instance to allow parsing JSON for Serie
 instance FromJSON Serie where
     parseJSON (Object v) = Serie <$>
                     v .: "id" <*>
@@ -52,6 +54,7 @@ instance FromJSON Serie where
                     v .: "watched"
     parseJSON _ = mzero
 
+-- | Instance to allow transforming a Serie to a JSON entry
 instance ToJSON Serie where
     toJSON (Serie i title originalTitle director year epNumber seNumber possession watched)
       = object ["id" .= i,
@@ -64,24 +67,29 @@ instance ToJSON Serie where
                 "possession" .= possession,
                 "watched" .= watched]
 
+-- | Instance to allow parsing CSV for Serie
 instance C.FromRecord Serie where
     parseRecord v
         | length v >= 8 = Serie <$> v C..! 0 <*> v C..! 1 <*> v C..! 2 <*> v C..! 3
                                     <*> v C..! 4 <*> v C..! 5 <*> v C..! 6 <*> v C..! 7 <*> v C..! 8
         | otherwise = mzero
 
+-- | Instance to allow transforming a Serie to a CSV line
 instance C.ToRecord Serie where
     toRecord (Serie i t o d y en sn p w) = C.record [C.toField i, C.toField t,
                           C.toField o, C.toField d, C.toField y, C.toField en,
                           C.toField sn, C.toField p, C.toField w]
 
+-- | Instance to reading a row as a Serie
 instance FromRow Serie where
   fromRow = Serie <$> field <*> field <*> field <*> field
              <*> field <*> field <*> field <*> field <*> field
 
+-- | Instance to transform a Serie into a row
 instance ToRow Serie where
     toRow (Serie i t o d y e s p w) = toRow (i, t, o, d, y, e, s, p, w)
 
+-- | Better Show instance => Pretty print of a Serie
 instance Show Serie where
     show (Serie _ t o d y e s p w) = printf "\ESC[1;37mTitle:\ESC[m %s\n\ESC[1;37mOriginal Title:\ESC[m %s\n\ESC[1;37mDirector:\ESC[m %s\n\
     \\ESC[1;37mYear or release:\ESC[m %s\n\ESC[1;37mNumber of episodes:\ESC[m %s\n\ESC[1;37mNumber of seasons:\ESC[m %s\n\ESC[1;37mPossession:\ESC[m %s\n\
@@ -106,13 +114,22 @@ instance Work Serie where
             }
     modWork conn n s = (addWork conn . cmpWork s . head) =<<
         (queryNamed conn "SELECT * FROM Series WHERE IdS = :id" [":id" := n] :: IO [Serie])
-    texToLine (Serie i t o d y e s p w) = printf "%d & %s & %s & %s & %s & %s & %s & %s & %s"
-                                            i t o d y e s p w
-    texToEntry c (Serie i t o d y e s p w) = printf c i t o d y e s p w
+    replaceList (Serie i t o d y e s p w) =  [ Replace "%index%" (show i)
+                                             , Replace "%title%" t
+                                             , Replace "%originalTitle%" o
+                                             , Replace "%director%" d
+                                             , Replace "%year%" y
+                                             , Replace "%episodeNumber%" e
+                                             , Replace "%seasonNumber%" s
+                                             , Replace "%possession%" p
+                                             , Replace "%watched%" w]
+    entryToFormatted c s = replaceWithList (replaceList s) c
 
+-- | Delete the serie matching the index
 delSerie :: Connection -> Int -> IO ()
 delSerie conn n = execute conn "DELETE FROM Series WHERE IdS = ?" (Only n)
 
+-- | Return a list of all series, sorted the way asked
 listSeries :: Sort -> Connection -> IO [(Int, String, String)]
 listSeries s conn = query_ conn sql
     where
@@ -122,6 +139,7 @@ listSeries s conn = query_ conn sql
                 Watched -> "SELECT IdS, Watched, Title FROM Series ORDER BY Watched"
                 Ids -> "SELECT IdS, Watched, Title FROM Series"
 
+-- | Print a serie
 printSerie :: Connection -> Int -> IO ()
 printSerie conn n =
     fetchSeries >>= putStrLn . printEmpty
@@ -154,14 +172,16 @@ exportSeriesCSV conn file = BS.writeFile file . C.encode =<< series
     where
         series = query_ conn "SELECT * FROM Series" :: IO [Serie]
 
+-- | Delete all rows from Series table
 purgeSeries :: Connection -> IO ()
 purgeSeries conn = execute_ conn "DELETE FROM Series"
 
-serieToFullTex :: FilePath -> Connection -> IO String
-serieToFullTex file conn = fmap concat . mapM toTex =<< series
+-- | Convert each entry to a formatted string, and concatenate
+serieToFullFormatted :: FilePath -> Connection -> IO String
+serieToFullFormatted file conn = fmap concat . mapM toFormatted =<< series
     where
-        toTex :: Serie -> IO String
-        toTex = toFullTex template
+        toFormatted :: Serie -> IO String
+        toFormatted = toFullFormatted template
         template :: IO String
         template = readFile file
         series :: IO [Serie]

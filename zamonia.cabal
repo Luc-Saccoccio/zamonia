@@ -1,6 +1,6 @@
-cabal-version:  2.2
+cabal-version:  3.0
 name:           zamonia
-version:        0.1.0.0
+version:        0.1.5.0
 description:    Please see the README on GitHub at <https://github.com/Luc-Saccoccio/zamonia>
 homepage:       https://github.com/Luc-Saccoccio/zamonia
 bug-reports:    https://github.com/Luc-Saccoccio/zamonia/issues
@@ -34,6 +34,7 @@ library
     , aeson-pretty
     , bytestring
     , cassava
+    , text-replace
     , sqlite-simple
     , text
     , vector
@@ -45,7 +46,7 @@ executable zamonia
       Paths_zamonia
   hs-source-dirs:
       app
-  ghc-options: -threaded -O2 -rtsopts -with-rtsopts=-N
+  ghc-options: -Wall -threaded -O2 -rtsopts -with-rtsopts=-N
   build-depends:
       base >=4.7 && <5
     , optparse-applicative

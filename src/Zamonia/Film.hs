@@ -10,9 +10,11 @@ import qualified Data.Csv                 as C
 import           Data.Vector              (Vector)
 import           Database.SQLite.Simple
 import           Text.Printf
+import           Text.Replace
 import           Zamonia.Work
 
-data Film = Film -- ^ Structure representing a film
+-- | Structure representing a film
+data Film = Film 
     { fid            :: Int    -- ^ ID
     , ftitle         :: String -- ^ Title
     , foriginalTitle :: String -- ^ Original Title
@@ -33,10 +35,11 @@ data FilmsCommand =
              | FImportJSON FilePath
              | FExportJSON FilePath
              | FExportCSV FilePath
-             | FExportFullTex FilePath FilePath
+             | FExportFormatted FilePath FilePath
              | FList Sort
              | FPurge
 
+-- | Instance to allow parsing JSON for Film
 instance FromJSON Film where
     parseJSON (Object v) = Film <$>
         v .: "id" <*>
@@ -48,6 +51,7 @@ instance FromJSON Film where
         v .: "watched"
     parseJSON _ = mzero
 
+-- | Instance to allow transforming a Film to a JSON entry
 instance ToJSON Film where
     toJSON (Film i title originalTitle director year possession watched)
       = object ["id" .= i,
@@ -58,23 +62,28 @@ instance ToJSON Film where
                 "possession" .= possession,
                 "watched" .= watched]
 
+-- | Instance to allow parsing CSV for Film
 instance C.FromRecord Film where
     parseRecord v
         | length v >= 6 = Film <$> v C..! 0 <*> v C..! 1 <*> v C..! 2 <*> v C..! 3
                                     <*> v C..! 4 <*> v C..! 5 <*> v C..! 6
-        | otherwise = mzero
+        | otherwise = mzero -- | Fail if the number of field if too low
 
+-- | Instance to allow transforming a Film to a CSV line
 instance C.ToRecord Film where
     toRecord (Film i t o d y p w) = C.record [C.toField i, C.toField t,
         C.toField o, C.toField d, C.toField y, C.toField p, C.toField w]
 
+-- | Instance to allow reading a row as a Film
 instance FromRow Film where
   fromRow = Film <$> field <*> field <*> field <*> field
              <*> field <*> field <*> field
 
+-- | Instance to transform a film into a row
 instance ToRow Film where
     toRow (Film i t o d y p w) = toRow (i, t, o, d, y, p, w)
 
+-- | Better Show instance => Pretty Print of a Film
 instance Show Film where
     show (Film _ t o d y p w) = printf "\ESC[1;37mTitle:\ESC[m %s\n\ESC[1;37mOriginal Title:\ESC[m %s\n\ESC[1;37mDirector:\ESC[m %s\n\
     \\ESC[1;37mYear or release:\ESC[m %s\n\ESC[1;37mPossession:\ESC[m %s\n\
@@ -97,22 +106,30 @@ instance Work Film where
             }
     modWork conn n f = (addWork conn . cmpWork f . head) =<<
         (queryNamed conn "SELECT * FROM Films WHERE IdF = :id" [":id" := n] :: IO [Film])
-    texToLine (Film i t o d y p w) = printf "%d & %s & %s & %s & %s & %s & %s"
-                                        i t o d y p w
-    texToEntry c (Film i t o d y p w) = printf c i t o d y p w
+    replaceList (Film i t o d y p w) = [ Replace "%index%" (show i)
+                                       , Replace "%title%" t
+                                       , Replace "%originalTitle%" o
+                                       , Replace "%director%" d
+                                       , Replace "%year%" y
+                                       , Replace "%possession%" p
+                                       , Replace "%watched%" w]
+    entryToFormatted c f = replaceWithList (replaceList f) c
 
+-- | Delete the film matching the index
 delFilm :: Connection -> Int -> IO ()
 delFilm conn n = execute conn "DELETE FROM Films WHERE IdF = ?" (Only n)
 
+-- | Return a list of all films, sorted the way asked
 listFilms :: Sort -> Connection -> IO [(Int, String, String)]
 listFilms s conn = query_ conn sql
     where
         sql :: Query
         sql = case s of
-                Names -> "SELECT IdF, Watched, Title FROM Films ORDER BY Title"
-                Watched -> "SELECT IdF, Watched, Title FROM Films ORDER BY Watched"
-                Ids -> "SELECT IdF, Watched, Title FROM Films"
+                Names -> "SELECT IdF, Watched, Title FROM Films ORDER BY Title" -- Sorting by name
+                Watched -> "SELECT IdF, Watched, Title FROM Films ORDER BY Watched" -- Sorting by watching state
+                Ids -> "SELECT IdF, Watched, Title FROM Films" -- Default sort => by index
 
+-- | Print a film
 printFilm :: Connection -> Int -> IO ()
 printFilm conn n =
     fetchFilms >>= putStrLn . printEmpty
@@ -146,14 +163,16 @@ exportFilmsCSV conn file = BS.writeFile file . C.encode =<< films
     where
         films = query_ conn "SELECT * FROM Films" :: IO [Film]
 
+-- | Delete all entries in Films table
 purgeFilms :: Connection -> IO ()
 purgeFilms conn = execute_ conn "DELETE FROM Films"
 
-filmsToFullTex :: FilePath -> Connection -> IO String
-filmsToFullTex file conn = fmap concat . mapM toTex =<< films
+-- | Convert each entry to a formatted string, and concatenate
+filmsToFullFormatted :: FilePath -> Connection -> IO String
+filmsToFullFormatted file conn = fmap concat . mapM toFormatted =<< films
     where
-        toTex :: Film -> IO String
-        toTex = toFullTex template
+        toFormatted :: Film -> IO String
+        toFormatted = toFullFormatted template -- | Prepare with the template
         template :: IO String
         template = readFile file
         films :: IO [Film]
