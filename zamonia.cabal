@@ -22,7 +22,7 @@ library
         Zamonia
       , Zamonia.Work
       , Zamonia.Film
-      , Zamonia.Serie
+      , Zamonia.Series
   other-modules:
       Paths_zamonia
   hs-source-dirs:

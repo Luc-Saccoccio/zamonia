@@ -11,7 +11,7 @@ import           Zamonia
 
 data Usage = Init
            | Films FilmsCommand
-           | Series SeriesCommand
+           | Series' SeriesCommand
 
 withInfo :: Parser a -> String -> ParserInfo a
 withInfo opts desc = info (helper <*> opts) $ progDesc desc
@@ -126,8 +126,8 @@ subCommandsFilms = subparser $
 
 subCommandsSeries :: Parser SeriesCommand
 subCommandsSeries = subparser $
-              command "add"    (info (helper <*> add) (progDesc "Add serie to the database"))
-           <> command "delete" (info (helper <*> del) (progDesc "Delete first matching serie from database"))
+              command "add"    (info (helper <*> add) (progDesc "Add a series to the database"))
+           <> command "delete" (info (helper <*> del) (progDesc "Delete first matching series from database"))
            <> command "show"   (info (helper <*> shw) (progDesc "Show informations about specified index"))
            <> command "modify" (info (helper <*> mdf) (progDesc "Modify first matching film from database"))
            <> command "import-csv" (info (helper <*> imc) (progDesc "Import series from CSV"))
@@ -139,12 +139,12 @@ subCommandsSeries = subparser $
            <> command "purge"  (info (pure SPurge) (progDesc "Purge all rows from table in database"))
            <> command "search" (info (helper <*> search) (progDesc "Search keyword in database"))
                where
-                   add       = SAdd    <$> (Serie <$> index <*> strArgument (metavar "TITLE" <> help "Title of the serie you want to add")
+                   add       = SAdd    <$> (Series <$> index <*> strArgument (metavar "TITLE" <> help "Title of the series you want to add")
                                                     <*> original <*> director <*> year <*> episodesNumber <*> seasonsNumber <*> possession <*> watched)
                    del       = SDelete <$> argument auto (metavar "INDEX" <> help "Index to delete, must be an integer")
                    shw       = SPrint  <$> argument auto (metavar "INDEX" <> help "Index to show, must be an integer")
                    mdf       = SModify <$> index
-                                        <*> (Serie <$> argument auto (metavar "INDEX" <> value (-1)) <*> tTitle <*> original <*> director <*> year
+                                        <*> (Series <$> argument auto (metavar "INDEX" <> value (-1)) <*> tTitle <*> original <*> director <*> year
                                                         <*> episodesNumber <*> seasonsNumber <*> possession <*> watched)
                    imc       = SImportCSV <$> importCSV
                    imj       = SImportJSON <$> importJSON
@@ -157,7 +157,7 @@ subCommandsSeries = subparser $
 usage :: Parser Usage
 usage = subparser $
        command "film"  (Films  <$> subCommandsFilms  `withInfo` "Work on Film list")
-    <> command "serie" (Series <$> subCommandsSeries `withInfo` "Work on Serie list")
+    <> command "series" (Series' <$> subCommandsSeries `withInfo` "Work on Series list")
     <> command "init"  (pure Init `withInfo` "Initiate a Zamonia database")
 
 runFilms :: FilmsCommand -> IO ()
@@ -176,14 +176,14 @@ runFilms _           = putStrLn "Not implemented yet"
 
 runSeries :: SeriesCommand -> IO ()
 runSeries (SAdd f)    = connection $ \c -> addWork c f
-runSeries (SDelete n) = connection $ \c -> delSerie c n
-runSeries (SPrint n)  = connection $ flip printSerie n
+runSeries (SDelete n) = connection $ \c -> delSeries c n
+runSeries (SPrint n)  = connection $ flip printSeries n
 runSeries (SModify n s) = connection $ \c -> modWork c n s
 runSeries (SImportJSON f) = connection $ flip importSeriesJSON f
 runSeries (SImportCSV f) = connection $ flip importSeriesCSV f
 runSeries (SExportJSON f) = connection $ flip exportSeriesJSON f
 runSeries (SExportCSV f) = connection $ flip exportSeriesCSV f
-runSeries (SExportFormatted t f) = connection $ serieToFullFormatted t >=> writeFile f
+runSeries (SExportFormatted t f) = connection $ seriesToFullFormatted t >=> writeFile f
 runSeries (SList s)       = connection $ listSeries s >=> mapM_ (\(n, w, t) -> putStr $ printf "\ESC[1;32m%d\ESC[m\t\ESC[1;35m%s\ESC[m\t%s\n" n w t)
 runSeries SPurge = connection purgeSeries
 runSeries _           = putStrLn "Not implemented yet"
@@ -196,7 +196,7 @@ main = do
             <> header "zamonia - a CLI personal library database written in haskell" ))
     case execution of
       Films c -> runFilms c
-      Series c -> runSeries c
+      Series' c -> runSeries c
       Init ->
           localLocation >>= createDirectoryIfMissing True
                     >> connection (\c -> execute_ c

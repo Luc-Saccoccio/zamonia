@@ -1,8 +1,8 @@
 {-# LANGUAGE OverloadedStrings #-}
-module Zamonia.Serie where
+module Zamonia.Series where
 
 import           Control.Monad            (mzero, (>=>))
-import           Data.Aeson
+import           Data.Aeson hiding (Series)
 import           Data.Aeson.Encode.Pretty (encodePretty)
 import qualified Data.ByteString.Lazy     as BS
 import qualified Data.Csv                 as C
@@ -13,7 +13,7 @@ import           Text.Replace
 import           Zamonia.Work
 
 
-data Serie = Serie -- ^ Structure representing a serie
+data Series = Series -- ^ Structure representing a series
     { sid            :: Int    -- ^ ID
     , stitle         :: String -- ^ Title
     , soriginalTitle :: String -- ^ Original Title
@@ -27,10 +27,10 @@ data Serie = Serie -- ^ Structure representing a serie
 
 -- | Commands related to series
 data SeriesCommand =
-            SAdd Serie
+            SAdd Series
              | SDelete Int
              | SPrint Int
-             | SModify Int Serie
+             | SModify Int Series
              | SSearch String String
              | SImportCSV FilePath
              | SImportJSON FilePath
@@ -40,9 +40,9 @@ data SeriesCommand =
              | SList Sort
              | SPurge
 
--- | Instance to allow parsing JSON for Serie
-instance FromJSON Serie where
-    parseJSON (Object v) = Serie <$>
+-- | Instance to allow parsing JSON for Series
+instance FromJSON Series where
+    parseJSON (Object v) = Series <$>
                     v .: "id" <*>
                     v .: "title" <*>
                     v .: "originalTitle" <*>
@@ -54,9 +54,9 @@ instance FromJSON Serie where
                     v .: "watched"
     parseJSON _ = mzero
 
--- | Instance to allow transforming a Serie to a JSON entry
-instance ToJSON Serie where
-    toJSON (Serie i title originalTitle director year epNumber seNumber possession watched)
+-- | Instance to allow transforming a Series to a JSON entry
+instance ToJSON Series where
+    toJSON (Series i title originalTitle director year epNumber seNumber possession watched)
       = object ["id" .= i,
                 "title" .= title,
                 "originalTitle" .= originalTitle,
@@ -67,41 +67,41 @@ instance ToJSON Serie where
                 "possession" .= possession,
                 "watched" .= watched]
 
--- | Instance to allow parsing CSV for Serie
-instance C.FromRecord Serie where
+-- | Instance to allow parsing CSV for Series
+instance C.FromRecord Series where
     parseRecord v
-        | length v >= 8 = Serie <$> v C..! 0 <*> v C..! 1 <*> v C..! 2 <*> v C..! 3
+        | length v >= 8 = Series <$> v C..! 0 <*> v C..! 1 <*> v C..! 2 <*> v C..! 3
                                     <*> v C..! 4 <*> v C..! 5 <*> v C..! 6 <*> v C..! 7 <*> v C..! 8
         | otherwise = mzero
 
--- | Instance to allow transforming a Serie to a CSV line
-instance C.ToRecord Serie where
-    toRecord (Serie i t o d y en sn p w) = C.record [C.toField i, C.toField t,
+-- | Instance to allow transforming a Series to a CSV line
+instance C.ToRecord Series where
+    toRecord (Series i t o d y en sn p w) = C.record [C.toField i, C.toField t,
                           C.toField o, C.toField d, C.toField y, C.toField en,
                           C.toField sn, C.toField p, C.toField w]
 
--- | Instance to reading a row as a Serie
-instance FromRow Serie where
-  fromRow = Serie <$> field <*> field <*> field <*> field
+-- | Instance to reading a row as a Series
+instance FromRow Series where
+  fromRow = Series <$> field <*> field <*> field <*> field
              <*> field <*> field <*> field <*> field <*> field
 
--- | Instance to transform a Serie into a row
-instance ToRow Serie where
-    toRow (Serie i t o d y e s p w) = toRow (i, t, o, d, y, e, s, p, w)
+-- | Instance to transform a Series into a row
+instance ToRow Series where
+    toRow (Series i t o d y e s p w) = toRow (i, t, o, d, y, e, s, p, w)
 
--- | Better Show instance => Pretty print of a Serie
-instance Show Serie where
-    show (Serie _ t o d y e s p w) = printf "\ESC[1;37mTitle:\ESC[m %s\n\ESC[1;37mOriginal Title:\ESC[m %s\n\ESC[1;37mDirector:\ESC[m %s\n\
+-- | Better Show instance => Pretty print of a Series
+instance Show Series where
+    show (Series _ t o d y e s p w) = printf "\ESC[1;37mTitle:\ESC[m %s\n\ESC[1;37mOriginal Title:\ESC[m %s\n\ESC[1;37mDirector:\ESC[m %s\n\
     \\ESC[1;37mYear or release:\ESC[m %s\n\ESC[1;37mNumber of episodes:\ESC[m %s\n\ESC[1;37mNumber of seasons:\ESC[m %s\n\ESC[1;37mPossession:\ESC[m %s\n\
     \\ESC[1;37mWatched:\ESC[m %s" t o d y e s p w
 
-instance Work Serie where
+instance Work Series where
     title = stitle
     id_ = sid
     addWork conn = execute conn "INSERT OR REPLACE INTO Series VALUES\
                                 \ (?,?,?,?,?,?,?,?,?)"
-    cmpWork (Serie i1 t1 o1 d1 y1 e1 s1 p1 w1) (Serie i2 t2 o2 d2 y2 e2 s2 p2 w2) =
-        Serie
+    cmpWork (Series i1 t1 o1 d1 y1 e1 s1 p1 w1) (Series i2 t2 o2 d2 y2 e2 s2 p2 w2) =
+        Series
             { sid = if i1 == -1 then i2 else i1
             , stitle = compareFields t1 t2
             , soriginalTitle = compareFields o1 o2
@@ -113,8 +113,8 @@ instance Work Serie where
             , swatched = compareFields w1 w2
             }
     modWork conn n s = (addWork conn . cmpWork s . head) =<<
-        (queryNamed conn "SELECT * FROM Series WHERE IdS = :id" [":id" := n] :: IO [Serie])
-    replaceList (Serie i t o d y e s p w) =  [ Replace "%index%" (show i)
+        (queryNamed conn "SELECT * FROM Series WHERE IdS = :id" [":id" := n] :: IO [Series])
+    replaceList (Series i t o d y e s p w) =  [ Replace "%index%" (show i)
                                              , Replace "%title%" t
                                              , Replace "%originalTitle%" o
                                              , Replace "%director%" d
@@ -125,9 +125,9 @@ instance Work Serie where
                                              , Replace "%watched%" w]
     entryToFormatted c s = replaceWithList (replaceList s) c
 
--- | Delete the serie matching the index
-delSerie :: Connection -> Int -> IO ()
-delSerie conn n = execute conn "DELETE FROM Series WHERE IdS = ?" (Only n)
+-- | Delete the series matching the index
+delSeries :: Connection -> Int -> IO ()
+delSeries conn n = execute conn "DELETE FROM Series WHERE IdS = ?" (Only n)
 
 -- | Return a list of all series, sorted the way asked
 listSeries :: Sort -> Connection -> IO [(Int, String, String)]
@@ -139,50 +139,50 @@ listSeries s conn = query_ conn sql
                 Watched -> "SELECT IdS, Watched, Title FROM Series ORDER BY Watched"
                 Ids -> "SELECT IdS, Watched, Title FROM Series"
 
--- | Print a serie
-printSerie :: Connection -> Int -> IO ()
-printSerie conn n =
+-- | Print a series
+printSeries :: Connection -> Int -> IO ()
+printSeries conn n =
     fetchSeries >>= putStrLn . printEmpty
         where
-    fetchSeries :: IO [Serie]
+    fetchSeries :: IO [Series]
     fetchSeries = queryNamed conn sql [":id" := n]
     sql = "SELECT * FROM Series WHERE IdS = :id"
 
 -- | Read the specified file, try to decode it. If it fails, print the error.
 -- If it didn't fail, add each work to the database.
 importSeriesJSON :: Connection -> FilePath -> IO ()
-importSeriesJSON conn = BS.readFile >=> \j -> orPrint (eitherDecode j :: Either String [Serie])
+importSeriesJSON conn = BS.readFile >=> \j -> orPrint (eitherDecode j :: Either String [Series])
                         $ mapM_ (addWork conn)
 
 -- | Read the specified file, try to decode it. If it fails, print the error.
 -- If it didn't fail, add each work to the database.
 importSeriesCSV :: Connection -> FilePath -> IO ()
-importSeriesCSV conn = BS.readFile >=> \c -> orPrint (C.decode C.HasHeader c :: Either String (Vector Serie))
+importSeriesCSV conn = BS.readFile >=> \c -> orPrint (C.decode C.HasHeader c :: Either String (Vector Series))
                         $ mapM_ (addWork conn)
 
 -- | Query the series, encode them and write them to the specified file.
 exportSeriesJSON :: Connection -> FilePath -> IO ()
 exportSeriesJSON conn file = BS.writeFile file . encodePretty =<< series
     where
-        series = query_ conn "SELECT * FROM Series" :: IO [Serie]
+        series = query_ conn "SELECT * FROM Series" :: IO [Series]
 
 -- | Query the series, encode them and write them to the specified file.
 exportSeriesCSV :: Connection -> FilePath -> IO ()
 exportSeriesCSV conn file = BS.writeFile file . C.encode =<< series
     where
-        series = query_ conn "SELECT * FROM Series" :: IO [Serie]
+        series = query_ conn "SELECT * FROM Series" :: IO [Series]
 
 -- | Delete all rows from Series table
 purgeSeries :: Connection -> IO ()
 purgeSeries conn = execute_ conn "DELETE FROM Series"
 
 -- | Convert each entry to a formatted string, and concatenate
-serieToFullFormatted :: FilePath -> Connection -> IO String
-serieToFullFormatted file conn = fmap concat . mapM toFormatted =<< series
+seriesToFullFormatted :: FilePath -> Connection -> IO String
+seriesToFullFormatted file conn = fmap concat . mapM toFormatted =<< series
     where
-        toFormatted :: Serie -> IO String
+        toFormatted :: Series -> IO String
         toFormatted = toFullFormatted template
         template :: IO String
         template = readFile file
-        series :: IO [Serie]
+        series :: IO [Series]
         series = query_ conn "SELECT * FROM Series"

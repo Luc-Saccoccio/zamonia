@@ -3,7 +3,7 @@ module Zamonia
     ( FilmsCommand(..)
     , SeriesCommand(..)
     , Film(..)
-    , Serie(..)
+    , Series(..)
     , Sort(..)
     , (<~>)
     , localLocation
@@ -12,9 +12,9 @@ module Zamonia
     , listSeries
     , addWork
     , delFilm
-    , delSerie
+    , delSeries
     , printFilm
-    , printSerie
+    , printSeries
     , modWork
     , importSeriesCSV
     , importFilmsCSV
@@ -22,7 +22,7 @@ module Zamonia
     , importFilmsJSON
     , exportSeriesCSV
     , exportSeriesJSON
-    , serieToFullFormatted
+    , seriesToFullFormatted
     , filmsToFullFormatted
     , exportFilmsCSV
     , exportFilmsJSON
@@ -35,7 +35,7 @@ import           Data.Functor           ((<&>))
 import           Database.SQLite.Simple
 import           System.Environment     (getEnv)
 import           Zamonia.Film
-import           Zamonia.Serie
+import           Zamonia.Series
 import           Zamonia.Work
 
 

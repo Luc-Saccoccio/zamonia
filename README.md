@@ -19,11 +19,11 @@ You can use the `-h/--help` option to print the program/command/subcommand help.
 The tool has 3 main commands, and multiple subcommands :
 - `init` : Initialize the Zamonia database.
 - `film` : Command leading to subcommands related to films.
-- `serie` : Command leading to subcommands related to series.
+- `series` : Command leading to subcommands related to series.
 
 ### Subcommands
 
-All the subcommands are the same for `film` and `serie`. Only optional arguments are different, they are listed in each subcommand help.
+All the subcommands are the same for `film` and `series`. Only optional arguments are different, they are listed in each subcommand help.
 
 There is 11 subcommands :
 - `add` : Add a work to the database, takes an index and a title. All other informations are optional.
@@ -46,6 +46,5 @@ $ source <(zamonia --bash-completion-script `which zamonia`)
 ## TODO
 
 - [ ] Add Search
-- [ ] Rename each `serie` to `series` becuasse I'm bade at anglishe :'(
 - [ ] Add support for books and video games
 - [ ] Write documentation for `export-tex`
