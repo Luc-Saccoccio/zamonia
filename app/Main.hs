@@ -104,6 +104,7 @@ subCommandsFilms = subparser $
            <> command "import-json" (info (helper <*> imj) (progDesc "Import a list from JSON"))
            <> command "export-csv" (info (helper <*> exc) (progDesc "Export a list to CSV"))
            <> command "export-json" (info (helper <*> exj) (progDesc "Export a list to JSON"))
+           <> command "export-tex-full" (info (helper <*> ext) (progDesc "Export a list to a list of entries in LaTeX"))
            <> command "list"   (info (helper <*> lis) (progDesc "List entries from database"))
            <> command "purge"  (info (pure FPurge) (progDesc "Purge all rows from table in database"))
            <> command "search" (info (helper <*> search) (progDesc "Search keyword in database"))
@@ -119,6 +120,7 @@ subCommandsFilms = subparser $
                    imj       = FImportJSON <$> importJSON
                    exc       = FExportCSV <$> export
                    exj       = FExportJSON <$> export
+                   ext       = FExportFullTex <$> strArgument (metavar "FILE" <> help "Path of the template. Please refer to github.com/Luc-Saccoccio/zamonia for explanations") <*> export
                    lis       = FList <$> liftA2 (<~>) sortNames sortWatched
                    search    = FSearch <$> strArgument (metavar "FIELD" <> help "In what field (e.g. title/year) the search will be done") <*> strArgument (metavar "SEARCH" <> help "Thing to search for")
 
@@ -132,6 +134,7 @@ subCommandsSeries = subparser $
            <> command "import-json" (info (helper <*> imj) (progDesc "Import series from JSON"))
            <> command "export-csv" (info (helper <*> exc) (progDesc "Export a list to CSV"))
            <> command "export-json" (info (helper <*> exj) (progDesc "Export a list to JSON"))
+           <> command "export-tex-full" (info (helper <*> ext) (progDesc "Export a list to a list of entries in LaTeX"))
            <> command "list"   (info (helper <*> lis) (progDesc "List entries from database"))
            <> command "purge"  (info (pure SPurge) (progDesc "Purge all rows from table in database"))
            <> command "search" (info (helper <*> search) (progDesc "Search keyword in database"))
@@ -147,6 +150,7 @@ subCommandsSeries = subparser $
                    imj       = SImportJSON <$> importJSON
                    exc       = SExportCSV <$> export
                    exj       = SExportJSON <$> export
+                   ext       = SExportFullTex <$> strArgument (metavar "FILE" <> help "Path of the template. Please refer to github.com/Luc-Saccoccio/zamonia for explanations") <*> export
                    lis       = SList <$> liftA2 (<~>) sortNames sortWatched
                    search    = SSearch <$> strArgument (metavar "FIELD" <> help "In what field (e.g. title/year) the search will be done") <*> strArgument (metavar "SEARCH" <> help "Thing to search for")
 
@@ -165,6 +169,7 @@ runFilms (FImportJSON f) = connection $ flip importFilmsJSON f
 runFilms (FImportCSV f) = connection $ flip importFilmsCSV f
 runFilms (FExportJSON f) = connection $ flip exportFilmsJSON f
 runFilms (FExportCSV f) = connection $ flip exportFilmsCSV f
+runFilms (FExportFullTex t f) = connection $ filmsToFullTex t >=> writeFile f
 runFilms (FList s)      = connection $ listFilms s >=> mapM_ (\(n, w, t) -> putStr $ printf "\ESC[1;32m%d\ESC[m\t\ESC[1;35m%s\ESC[m\t%s\n" n w t)
 runFilms FPurge = connection purgeFilms
 runFilms c           = putStrLn "Not implemented yet"
@@ -178,6 +183,7 @@ runSeries (SImportJSON f) = connection $ flip importSeriesJSON f
 runSeries (SImportCSV f) = connection $ flip importSeriesCSV f
 runSeries (SExportJSON f) = connection $ flip exportSeriesJSON f
 runSeries (SExportCSV f) = connection $ flip exportSeriesCSV f
+runSeries (SExportFullTex t f) = connection $ serieToFullTex t >=> writeFile f
 runSeries (SList s)       = connection $ listSeries s >=> mapM_ (\(n, w, t) -> putStr $ printf "\ESC[1;32m%d\ESC[m\t\ESC[1;35m%s\ESC[m\t%s\n" n w t)
 runSeries SPurge = connection purgeSeries
 runSeries c           = putStrLn "Not implemented yet"

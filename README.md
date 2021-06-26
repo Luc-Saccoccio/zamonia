@@ -46,4 +46,5 @@ $ source <(zamonia --bash-completion-script `which zamonia`)
 
 - [ ] Add Search
 - [ ] Add support for books and video games
+- [ ] Add export (only) to LaTeX. The idea is to be able to reference each entry in a PDF.
 - [ ] Enhance and **document** the code
