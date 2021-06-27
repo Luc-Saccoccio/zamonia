@@ -2,32 +2,53 @@
 module Zamonia
     ( FilmsCommand(..)
     , SeriesCommand(..)
+    , BooksCommand(..)
     , Film(..)
     , Series(..)
+    , Book(..)
     , Sort(..)
     , (<~>)
     , localLocation
     , connection
+
     , listFilms
     , listSeries
-    , addWork
+    , listBooks
+
     , delFilm
     , delSeries
+    , delBook
+
     , printFilm
     , printSeries
+    , printBook
+
+    , addWork
     , modWork
+
     , importSeriesCSV
     , importFilmsCSV
+    , importBooksCSV
+
     , importSeriesJSON
     , importFilmsJSON
+    , importBooksJSON
+
     , exportSeriesCSV
+    , exportFilmsCSV
+    , exportBooksCSV
+
     , exportSeriesJSON
+    , exportFilmsJSON
+    , exportBooksJSON
+
     , seriesToFullFormatted
     , filmsToFullFormatted
-    , exportFilmsCSV
-    , exportFilmsJSON
+    , booksToFullFormatted
+
     , purgeFilms
-    , purgeSeries)
+    , purgeSeries
+    , purgeBooks)
     where
 
 import           Control.Exception      (bracket)
@@ -36,6 +57,7 @@ import           Database.SQLite.Simple
 import           System.Environment     (getEnv)
 import           Zamonia.Film
 import           Zamonia.Series
+import           Zamonia.Book
 import           Zamonia.Work
 
 

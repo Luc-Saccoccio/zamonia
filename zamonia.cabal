@@ -1,6 +1,6 @@
 cabal-version:  3.0
 name:           zamonia
-version:        0.1.5.0
+version:        0.1.5.5
 description:    Please see the README on GitHub at <https://github.com/Luc-Saccoccio/zamonia>
 homepage:       https://github.com/Luc-Saccoccio/zamonia
 bug-reports:    https://github.com/Luc-Saccoccio/zamonia/issues
@@ -23,6 +23,7 @@ library
       , Zamonia.Work
       , Zamonia.Film
       , Zamonia.Series
+      , Zamonia.Book
   other-modules:
       Paths_zamonia
   hs-source-dirs:

@@ -2,7 +2,7 @@ module Zamonia.Work
     where
 
 import           Database.SQLite.Simple (Connection)
-import           Text.Replace           (Replace)
+import           Text.Replace           (Replace, replaceWithList)
 
 class Work a where
     title :: a -> String -- ^ Title of the work
@@ -12,6 +12,7 @@ class Work a where
     cmpWork :: a -> a -> a -- ^ Comparing two works
     replaceList :: a -> [Replace] -- ^ List containing replacing information for a specific work
     entryToFormatted :: String -> a -> String -- ^ Convert an entry to a formatted string
+    entryToFormatted c w = replaceWithList (replaceList w) c
     toFullFormatted :: IO String -> a -> IO String
     toFullFormatted = (??) . (entryToFormatted <$>)
 
@@ -35,10 +36,10 @@ fab ?? a = fmap ($ a) fab
 -- | Types of sort
 data Sort = Ids
           | Names
-          | Watched
+          | Done
 
 -- | Select sort
 (<~>) :: Sort -> Sort -> Sort
 (<~>) _ Names   = Names
-(<~>) _ Watched = Watched
+(<~>) _ Done = Done
 (<~>) a Ids     = a

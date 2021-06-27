@@ -70,7 +70,7 @@ instance ToJSON Series where
 -- | Instance to allow parsing CSV for Series
 instance C.FromRecord Series where
     parseRecord v
-        | length v >= 8 = Series <$> v C..! 0 <*> v C..! 1 <*> v C..! 2 <*> v C..! 3
+        | length v >= 9 = Series <$> v C..! 0 <*> v C..! 1 <*> v C..! 2 <*> v C..! 3
                                     <*> v C..! 4 <*> v C..! 5 <*> v C..! 6 <*> v C..! 7 <*> v C..! 8
         | otherwise = mzero
 
@@ -123,7 +123,6 @@ instance Work Series where
                                              , Replace "%seasonNumber%" s
                                              , Replace "%possession%" p
                                              , Replace "%watched%" w]
-    entryToFormatted c s = replaceWithList (replaceList s) c
 
 -- | Delete the series matching the index
 delSeries :: Connection -> Int -> IO ()
@@ -135,9 +134,9 @@ listSeries s conn = query_ conn sql
     where
         sql :: Query
         sql = case s of
-                Names -> "SELECT IdS, Watched, Title FROM Series ORDER BY Title"
-                Watched -> "SELECT IdS, Watched, Title FROM Series ORDER BY Watched"
-                Ids -> "SELECT IdS, Watched, Title FROM Series"
+                Names -> "SELECT IdS, Done, Title FROM Series ORDER BY Title"
+                Done -> "SELECT IdS, Done, Title FROM Series ORDER BY Done"
+                Ids -> "SELECT IdS, Done, Title FROM Series"
 
 -- | Print a series
 printSeries :: Connection -> Int -> IO ()

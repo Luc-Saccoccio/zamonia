@@ -65,7 +65,7 @@ instance ToJSON Film where
 -- | Instance to allow parsing CSV for Film
 instance C.FromRecord Film where
     parseRecord v
-        | length v >= 6 = Film <$> v C..! 0 <*> v C..! 1 <*> v C..! 2 <*> v C..! 3
+        | length v >= 7 = Film <$> v C..! 0 <*> v C..! 1 <*> v C..! 2 <*> v C..! 3
                                     <*> v C..! 4 <*> v C..! 5 <*> v C..! 6
         | otherwise = mzero -- | Fail if the number of field if too low
 
@@ -113,7 +113,6 @@ instance Work Film where
                                        , Replace "%year%" y
                                        , Replace "%possession%" p
                                        , Replace "%watched%" w]
-    entryToFormatted c f = replaceWithList (replaceList f) c
 
 -- | Delete the film matching the index
 delFilm :: Connection -> Int -> IO ()
@@ -125,9 +124,9 @@ listFilms s conn = query_ conn sql
     where
         sql :: Query
         sql = case s of
-                Names -> "SELECT IdF, Watched, Title FROM Films ORDER BY Title" -- Sorting by name
-                Watched -> "SELECT IdF, Watched, Title FROM Films ORDER BY Watched" -- Sorting by watching state
-                Ids -> "SELECT IdF, Watched, Title FROM Films" -- Default sort => by index
+                Names -> "SELECT IdF, Done, Title FROM Films ORDER BY Title" -- Sorting by name
+                Done -> "SELECT IdF, Done, Title FROM Films ORDER BY Done" -- Sorting by watching state
+                Ids -> "SELECT IdF, Done, Title FROM Films" -- Default sort => by index
 
 -- | Print a film
 printFilm :: Connection -> Int -> IO ()

@@ -10,8 +10,10 @@ import           Text.Printf
 import           Zamonia
 
 data Usage = Init
+           | Update
            | Films FilmsCommand
            | Series' SeriesCommand
+           | Books BooksCommand
 
 withInfo :: Parser a -> String -> ParserInfo a
 withInfo opts desc = info (helper <*> opts) $ progDesc desc
@@ -39,6 +41,27 @@ director = strOption ( long "director"
                 <> metavar "DIRECTOR"
                 <> value ""
                 <> help "Director")
+
+publisher :: Parser String
+publisher = strOption ( long "publisher"
+                <> short 'e'
+                <> metavar "PUBLISHER"
+                <> value ""
+                <> help "Publisher/Editor")
+
+author :: Parser String
+author = strOption ( long "author"
+                <> short 'a'
+                <> metavar "AUTHOR"
+                <> value ""
+                <> help "Author")
+
+isbn :: Parser String
+isbn = strOption ( long "isbn"
+            <> short 'i'
+            <> metavar "ISBN"
+            <> value ""
+            <> help "IBSN")
 
 year :: Parser String
 year = strOption ( long "year"
@@ -81,8 +104,13 @@ sortNames = flag Ids Names ( long "names"
             <> help "Sort by names and not by ID")
 
 sortWatched :: Parser Sort
-sortWatched = flag Ids Watched ( long "watched"
+sortWatched = flag Ids Done ( long "watched"
             <> short 'w'
+            <> help "Sort by watching and not by ID")
+
+sortRead :: Parser Sort
+sortRead = flag Ids Done ( long "read"
+            <> short 'r'
             <> help "Sort by watching and not by ID")
 
 importCSV :: Parser FilePath
@@ -154,10 +182,42 @@ subCommandsSeries = subparser $
                    lis       = SList <$> liftA2 (<~>) sortNames sortWatched
                    search    = SSearch <$> strArgument (metavar "FIELD" <> help "In what field (e.g. title/year) the search will be done") <*> strArgument (metavar "SEARCH" <> help "Thing to search for")
 
+subCommandsBooks :: Parser BooksCommand
+subCommandsBooks = subparser $
+              command "add"    (info (helper <*> add) (progDesc "Add a book to the database"))
+           <> command "delete" (info (helper <*> del) (progDesc "Delete first matching book from database"))
+           <> command "show"   (info (helper <*> shw) (progDesc "Show informations about specified index"))
+           <> command "modify" (info (helper <*> mdf) (progDesc "Modify first matching book from database"))
+           <> command "import-csv" (info (helper <*> imc) (progDesc "Import books from CSV"))
+           <> command "import-json" (info (helper <*> imj) (progDesc "Import books from JSON"))
+           <> command "export-csv" (info (helper <*> exc) (progDesc "Export a list to CSV"))
+           <> command "export-json" (info (helper <*> exj) (progDesc "Export a list to JSON"))
+           <> command "export-formatted" (info (helper <*> ext) (progDesc "Export a list to a list of formatted entries"))
+           <> command "list"   (info (helper <*> lis) (progDesc "List entries from database"))
+           <> command "purge"  (info (pure BPurge) (progDesc "Purge all rows from table in database"))
+           <> command "search" (info (helper <*> search) (progDesc "Search keyword in database"))
+               where
+                   add       = BAdd    <$> (Book <$> index <*> isbn <*> strArgument (metavar "TITLE" <> help "Title of the book you want to add")
+                                                    <*> original <*> author <*> publisher <*> year <*> possession <*> watched)
+                   del       = BDelete <$> argument auto (metavar "INDEX" <> help "Index to delete, must be an integer")
+                   shw       = BPrint  <$> argument auto (metavar "INDEX" <> help "Index to show, must be an integer")
+                   mdf       = BModify <$> index
+                                        <*> (Book <$> argument auto (metavar "INDEX" <> value (-1)) <*> isbn <*> tTitle <*> original <*> author <*> publisher
+                                                        <*> year <*> possession <*> watched)
+                   imc       = BImportCSV <$> importCSV
+                   imj       = BImportJSON <$> importJSON
+                   exc       = BExportCSV <$> export
+                   exj       = BExportJSON <$> export
+                   ext       = BExportFormatted <$> strArgument (metavar "FILE" <> help "Path of the template. Please refer to github.com/Luc-Saccoccio/zamonia for explanations") <*> export
+                   lis       = BList <$> liftA2 (<~>) sortNames sortRead
+                   search    = BSearch <$> strArgument (metavar "FIELD" <> help "In what field (e.g. title/year) the search will be done") <*> strArgument (metavar "SEARCH" <> help "Thing to search for")
+
 usage :: Parser Usage
 usage = subparser $
-       command "film"  (Films  <$> subCommandsFilms  `withInfo` "Work on Film list")
+       command "film"   (Films  <$> subCommandsFilms  `withInfo` "Work on Films list")
     <> command "series" (Series' <$> subCommandsSeries `withInfo` "Work on Series list")
+    <> command "book"   (Books <$> subCommandsBooks `withInfo` "Work on Books list")
+    <> command "update" (pure Update `withInfo` "Changes required if database was created before 0.2.0.0")
     <> command "init"  (pure Init `withInfo` "Initiate a Zamonia database")
 
 runFilms :: FilmsCommand -> IO ()
@@ -171,7 +231,7 @@ runFilms (FExportJSON f) = connection $ flip exportFilmsJSON f
 runFilms (FExportCSV f) = connection $ flip exportFilmsCSV f
 runFilms (FExportFormatted t f) = connection $ filmsToFullFormatted t >=> writeFile f
 runFilms (FList s)      = connection $ listFilms s >=> mapM_ (\(n, w, t) -> putStr $ printf "\ESC[1;32m%d\ESC[m\t\ESC[1;35m%s\ESC[m\t%s\n" n w t)
-runFilms FPurge = connection purgeFilms
+runFilms  FPurge = connection purgeFilms
 runFilms _           = putStrLn "Not implemented yet"
 
 runSeries :: SeriesCommand -> IO ()
@@ -185,8 +245,22 @@ runSeries (SExportJSON f) = connection $ flip exportSeriesJSON f
 runSeries (SExportCSV f) = connection $ flip exportSeriesCSV f
 runSeries (SExportFormatted t f) = connection $ seriesToFullFormatted t >=> writeFile f
 runSeries (SList s)       = connection $ listSeries s >=> mapM_ (\(n, w, t) -> putStr $ printf "\ESC[1;32m%d\ESC[m\t\ESC[1;35m%s\ESC[m\t%s\n" n w t)
-runSeries SPurge = connection purgeSeries
+runSeries  SPurge = connection purgeSeries
 runSeries _           = putStrLn "Not implemented yet"
+
+runBooks :: BooksCommand -> IO ()
+runBooks (BAdd f)    = connection $ \c -> addWork c f
+runBooks (BDelete n) = connection $ \c -> delBook c n
+runBooks (BPrint n)  = connection $ flip printBook n
+runBooks (BModify n s) = connection $ \c -> modWork c n s
+runBooks (BImportJSON f) = connection $ flip importBooksJSON f
+runBooks (BImportCSV f) = connection $ flip importBooksCSV f
+runBooks (BExportJSON f) = connection $ flip exportBooksJSON f
+runBooks (BExportCSV f) = connection $ flip exportBooksCSV f
+runBooks (BExportFormatted t f) = connection $ booksToFullFormatted t >=> writeFile f
+runBooks (BList s)       = connection $ listBooks s >=> mapM_ (\(n, w, t) -> putStr $ printf "\ESC[1;32m%d\ESC[m\t\ESC[1;35m%s\ESC[m\t%s\n" n w t)
+runBooks  BPurge = connection purgeBooks
+runBooks _           = putStrLn "Not implemented yet"
 
 main :: IO ()
 main = do
@@ -197,23 +271,42 @@ main = do
     case execution of
       Films c -> runFilms c
       Series' c -> runSeries c
+      Books c -> runBooks c
+      Update -> connection (\c -> execute_ c
+                    "ALTER TABLE Films RENAME COLUMN Watched TO Done;"
+                    >> execute_ c
+                    "ALTER TABLE Films RENAME COLUMN Director TO Author;"
+                    >> execute_ c
+                    "ALTER TABLE Series RENAME COLUMN Watched TO Done;"
+                    >> execute_ c
+                    "ALTER TABLE Series RENAME COLUMN Director TO Author;")
       Init ->
           localLocation >>= createDirectoryIfMissing True
                     >> connection (\c -> execute_ c
                         "CREATE TABLE IF NOT EXISTS Films (IdF INTEGER PRIMARY KEY\
                                                         \ , Title         TEXT\
                                                         \ , OriginalTitle TEXT\
-                                                        \ , Director      TEXT\
+                                                        \ , Author        TEXT\
                                                         \ , Year          TEXT\
                                                         \ , Possession    TEXT\
-                                                        \ , Watched       TEXT)"
+                                                        \ , Done          TEXT)"
                     >> execute_ c
                         "CREATE TABLE IF NOT EXISTS Series (IdS INTEGER PRIMARY KEY\
                                                         \ , Title         TEXT\
                                                         \ , OriginalTitle TEXT\
-                                                        \ , Director      TEXT\
+                                                        \ , Author        TEXT\
                                                         \ , Year          TEXT\
                                                         \ , EpisodeNumber TEXT\
                                                         \ , SeasonNumber  TEXT\
                                                         \ , Possession    TEXT\
-                                                        \ , Watched       TEXT)")
+                                                        \ , Done          TEXT)"
+                    >> execute_ c
+                        "CREATE TABLE IF NOT EXISTS Books (IdB INTEGER PRIMARY KEY\
+                                                       \ , ISBN          TEXT\
+                                                       \ , Title         TEXT\
+                                                       \ , OriginalTitle TEXT\
+                                                       \ , Author        TEXT\
+                                                       \ , Publisher     TEXT\
+                                                       \ , Year          TEXT\
+                                                       \ , Possession    TEXT\
+                                                       \ , Done          TEXT)")
