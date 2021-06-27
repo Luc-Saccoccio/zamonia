@@ -86,7 +86,7 @@ instance ToRow Film where
 -- | Better Show instance => Pretty Print of a Film
 instance Show Film where
     show (Film _ t o d y p w) = printf "\ESC[1;37mTitle:\ESC[m %s\n\ESC[1;37mOriginal Title:\ESC[m %s\n\ESC[1;37mDirector:\ESC[m %s\n\
-    \\ESC[1;37mYear or release:\ESC[m %s\n\ESC[1;37mPossession:\ESC[m %s\n\
+    \\ESC[1;37mYear of release:\ESC[m %s\n\ESC[1;37mPossession:\ESC[m %s\n\
     \\ESC[1;37mWatched:\ESC[m %s" t o d y p w
 
 instance Work Film where

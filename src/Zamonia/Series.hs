@@ -2,7 +2,7 @@
 module Zamonia.Series where
 
 import           Control.Monad            (mzero, (>=>))
-import           Data.Aeson hiding (Series)
+import           Data.Aeson               hiding (Series)
 import           Data.Aeson.Encode.Pretty (encodePretty)
 import qualified Data.ByteString.Lazy     as BS
 import qualified Data.Csv                 as C
@@ -92,7 +92,7 @@ instance ToRow Series where
 -- | Better Show instance => Pretty print of a Series
 instance Show Series where
     show (Series _ t o d y e s p w) = printf "\ESC[1;37mTitle:\ESC[m %s\n\ESC[1;37mOriginal Title:\ESC[m %s\n\ESC[1;37mDirector:\ESC[m %s\n\
-    \\ESC[1;37mYear or release:\ESC[m %s\n\ESC[1;37mNumber of episodes:\ESC[m %s\n\ESC[1;37mNumber of seasons:\ESC[m %s\n\ESC[1;37mPossession:\ESC[m %s\n\
+    \\ESC[1;37mYear of release:\ESC[m %s\n\ESC[1;37mNumber of episodes:\ESC[m %s\n\ESC[1;37mNumber of seasons:\ESC[m %s\n\ESC[1;37mPossession:\ESC[m %s\n\
     \\ESC[1;37mWatched:\ESC[m %s" t o d y e s p w
 
 instance Work Series where
