@@ -1,15 +1,16 @@
 # Zamonia
 
+## Disclaimer
+
+1. I have no idea what I'm doing, but I'm doing it. Suggestions about code style are of course welcome.
+2. Don't expect anything from this tool, neither stability nor consistent update schedule
+3. Consequently, do not expect Windows/MacOS support. Do it yourself if you want it, I'm making this tool for me. The same goes for other features.
+
 ## Installation
 
 Using `stack`:
 ```
 stack install
-```
-
-If you are using Arch, you can install the AUR package `zamonia-bin` e.g.:
-```
-yay -S zamonia-bin
 ```
 
 ## Usage
@@ -18,13 +19,13 @@ You can use the `-h/--help` option to print the program/command/subcommand help.
 
 The tool has 3 main commands, and multiple subcommands:
 - `init`: Initialize the Zamonia database.
-- `update`: Only required if the database was initialized before 0.2.0.0. Correct the database.
 - `film`: Command leading to subcommands related to films.
 - `series`: Command leading to subcommands related to series.
+- `book`: Command leading to subcommands related to books.
 
 ### Subcommands
 
-All the subcommands are the same for `film` and `series`. Only optional arguments are different, they are listed in each subcommand help.
+All the subcommands are the same. Only optional arguments are different, they are listed in each subcommand help.
 
 There is 11 subcommands:
 - `add`: Add a work to the database, takes an index and a title. All other informations are optional.
@@ -65,7 +66,7 @@ Here are the keywords for films:
 - `%director%`: Director of the film
 - `%year%`: Year of release
 - `%possession%`: Possession state
-- `%watchde%`: Watching state
+- `%watched%`: Watching state
 
 #### Films
 
@@ -78,9 +79,9 @@ Here are the keywords for series:
 - `%episodeNumber%`: Number of episode
 - `%seasonNumber%`: Number of seasons
 - `%possession%`: Possession state
-- `%watchde%`: Watching state
+- `%watched%`: Watching state
 
-####
+#### Books
 
 Here are the keywords for books:
 - `%index%`: Index of the book
@@ -93,10 +94,6 @@ Here are the keywords for books:
 - `%possession%`: Possession state
 - `%read%`: Reading state
 
-### Updating
-
-The structure of the database is supposed to be static. **If and only if** there is a error in the name of a column/table, or **if and only if** a field is missing should the structure change. In that case, a new command will be added to update the database accordingly.
-
 ### Completions
 
 You can activate completions by executing
@@ -106,6 +103,9 @@ $ source <(zamonia --bash-completion-script `which zamonia`)
 
 ## TODO
 
+- [ ] Add a TUI
+- [ ] Simplify option parsing (too much code for that)
 - [ ] Add Search
-- [ ] Write a man page (for AUR install at least)
+- [ ] Modify printWork functions to return `(Work w => IO w)` instead of `IO ()` so it can be used in Zamonia.UI.*
 - [ ] Add support for video games
+- [ ] Commit. Else, it's gonna be incomprehensible
