@@ -6,7 +6,10 @@ import           Control.Monad            (mzero, (>=>))
 import           Data.Aeson
 import           Data.Aeson.Encode.Pretty (encodePretty)
 import qualified Data.ByteString.Lazy     as BS
-import qualified Data.Csv                 as C
+import qualified Data.Csv                 as C hiding ((.!))
+import qualified Data.Text as T
+import qualified Data.Text.Lazy as L
+import           Data.Csv ((.!))
 import           Data.Vector              (Vector)
 import           Database.SQLite.Simple
 import           Text.Printf
@@ -14,14 +17,14 @@ import           Text.Replace
 import           Zamonia.Work
 
 -- | Structure representing a film
-data Film = Film 
-    { fid            :: Int    -- ^ ID
-    , ftitle         :: String -- ^ Title
-    , foriginalTitle :: String -- ^ Original Title
-    , fdirector      :: String -- ^ Director
-    , fyear          :: String -- ^ Year of release
-    , fpossession    :: String -- ^ Yes/No, Physical/Virtual (for example)
-    , fwatched       :: String -- ^ Yes/No
+data Film = Film
+    { _fid            :: Int    -- ^ ID
+    , _ftitle         :: T.Text -- ^ Title
+    , _foriginalTitle :: T.Text -- ^ Original Title
+    , _fdirector      :: T.Text -- ^ Director
+    , _fyear          :: T.Text -- ^ Year of release
+    , _fpossession    :: T.Text -- ^ Yes/No, Physical/Virtual (for example)
+    , _fwatched       :: T.Text -- ^ Yes/No
     } deriving Eq
 
 -- | Commands related to films
@@ -65,9 +68,9 @@ instance ToJSON Film where
 -- | Instance to allow parsing CSV for Film
 instance C.FromRecord Film where
     parseRecord v
-        | length v >= 7 = Film <$> v C..! 0 <*> v C..! 1 <*> v C..! 2 <*> v C..! 3
-                                    <*> v C..! 4 <*> v C..! 5 <*> v C..! 6
-        | otherwise = mzero -- | Fail if the number of field if too low
+        | length v >= 7 = Film <$> v .! 0 <*> v .! 1 <*> v .! 2 <*> v .! 3
+                                    <*> v .! 4 <*> v .! 5 <*> v .! 6
+        | otherwise = mzero -- Fail if the number of field if too low
 
 -- | Instance to allow transforming a Film to a CSV line
 instance C.ToRecord Film where
@@ -90,23 +93,32 @@ instance Show Film where
     \\ESC[1;37mWatched:\ESC[m %s" t o d y p w
 
 instance Work Film where
-    title = ftitle
-    id_ = fid
+    new = Film { _fid = -1
+               , _ftitle = T.empty
+               , _foriginalTitle = T.empty
+               , _fdirector = T.empty
+               , _fyear = T.empty
+               , _fpossession = T.empty
+               , _fwatched = T.empty
+               }
+    title = _ftitle
+    id_ = show . _fid
     addWork conn = execute conn "INSERT OR REPLACE INTO Films VALUES\
                                 \ (?,?,?,?,?,?,?)"
     cmpWork (Film i1 t1 o1 d1 y1 p1 w1) (Film i2 t2 o2 d2 y2 p2 w2) =
         Film
-            { fid = if i2 == -1 then i1 else i2
-            , ftitle = compareFields t1 t2
-            , foriginalTitle = compareFields o1 o2
-            , fdirector = compareFields d1 d2
-            , fyear = compareFields y1 y2
-            , fpossession = compareFields p1 p2
-            , fwatched = compareFields w1 w2
+            { _fid = if i2 == -1 then i1 else i2
+            , _ftitle = compareFields t1 t2
+            , _foriginalTitle = compareFields o1 o2
+            , _fdirector = compareFields d1 d2
+            , _fyear = compareFields y1 y2
+            , _fpossession = compareFields p1 p2
+            , _fwatched = compareFields w1 w2
             }
+    queryAll conn = query_ conn "SELECT * FROM Films"
     modWork conn n f = (addWork conn . cmpWork f . head) =<<
         (queryNamed conn "SELECT * FROM Films WHERE IdF = :id" [":id" := n] :: IO [Film])
-    replaceList (Film i t o d y p w) = [ Replace "%index%" (show i)
+    replaceList (Film i t o d y p w) = [ Replace "%index%" (T.pack $ show i)
                                        , Replace "%title%" t
                                        , Replace "%originalTitle%" o
                                        , Replace "%director%" d
@@ -138,41 +150,6 @@ printFilm conn n =
     sql :: Query
     sql = "SELECT * FROM Films WHERE IdF = :id"
 
--- | Read the specified file, try to decode it. If it fails, print the error.
--- If it didn't fail, add each work to the database.
-importFilmsJSON :: Connection -> FilePath -> IO ()
-importFilmsJSON conn = BS.readFile >=> \j -> orPrint (eitherDecode j :: Either String [Film])
-                        $ mapM_ (addWork conn)
-
--- | Read the specified file, try to decode it. If it fails, print the error.
--- If it didn't fail, add each work to the database.
-importFilmsCSV :: Connection -> FilePath -> IO ()
-importFilmsCSV conn = BS.readFile >=> \c -> orPrint (C.decode C.HasHeader c :: Either String (Vector Film))
-                        $ mapM_ (addWork conn)
-
--- | Query the films, encode them and write them to the specified file.
-exportFilmsJSON :: Connection -> FilePath -> IO ()
-exportFilmsJSON conn file = BS.writeFile file . encodePretty =<< films
-    where
-        films = query_ conn "SELECT * FROM Films" :: IO [Film]
-
--- | Query the films, encode them and write them to the specified file.
-exportFilmsCSV :: Connection -> FilePath -> IO ()
-exportFilmsCSV conn file = BS.writeFile file . C.encode =<< films
-    where
-        films = query_ conn "SELECT * FROM Films" :: IO [Film]
-
 -- | Delete all entries in Films table
 purgeFilms :: Connection -> IO ()
 purgeFilms conn = execute_ conn "DELETE FROM Films"
-
--- | Convert each entry to a formatted string, and concatenate
-filmsToFullFormatted :: FilePath -> Connection -> IO String
-filmsToFullFormatted file conn = fmap concat . mapM toFormatted =<< films
-    where
-        toFormatted :: Film -> IO String
-        toFormatted = toFullFormatted template -- | Prepare with the template
-        template :: IO String
-        template = readFile file
-        films :: IO [Film]
-        films = query_ conn "SELECT * FROM Films"

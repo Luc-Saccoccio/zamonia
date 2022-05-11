@@ -1,4 +1,5 @@
 {-# LANGUAGE OverloadedStrings #-}
+
 module Zamonia.Series where
 
 import           Control.Monad            (mzero, (>=>))
@@ -6,6 +7,8 @@ import           Data.Aeson               hiding (Series)
 import           Data.Aeson.Encode.Pretty (encodePretty)
 import qualified Data.ByteString.Lazy     as BS
 import qualified Data.Csv                 as C
+import qualified Data.Text as T
+import qualified Data.Text.Lazy as L
 import           Data.Vector              (Vector)
 import           Database.SQLite.Simple
 import           Text.Printf
@@ -14,15 +17,15 @@ import           Zamonia.Work
 
 
 data Series = Series -- ^ Structure representing a series
-    { sid            :: Int    -- ^ ID
-    , stitle         :: String -- ^ Title
-    , soriginalTitle :: String -- ^ Original Title
-    , sdirector      :: String -- ^ Director
-    , syear          :: String -- ^ Year of release
-    , epNumber       :: String -- ^ Number of episodes
-    , seNumber       :: String -- ^ Number of seasons
-    , spossession    :: String -- ^ Yes/No, Physical/Virtual (for example)
-    , swatched       :: String -- ^ Yes/No
+    { _sid            :: Int    -- ^ ID
+    , _stitle         :: T.Text -- ^ Title
+    , _soriginalTitle :: T.Text -- ^ Original Title
+    , _sdirector      :: T.Text -- ^ Director
+    , _syear          :: T.Text -- ^ Year of release
+    , _epNumber       :: T.Text -- ^ Number of episodes
+    , _seNumber       :: T.Text -- ^ Number of seasons
+    , _spossession    :: T.Text -- ^ Yes/No, Physical/Virtual (for example)
+    , _swatched       :: T.Text -- ^ Yes/No
     } deriving Eq
 
 -- | Commands related to series
@@ -96,25 +99,36 @@ instance Show Series where
     \\ESC[1;37mWatched:\ESC[m %s" t o d y e s p w
 
 instance Work Series where
-    title = stitle
-    id_ = sid
+    new = Series { _sid = -1
+                 , _stitle = T.empty
+                 , _soriginalTitle = T.empty
+                 , _sdirector = T.empty
+                 , _syear = T.empty
+                 , _epNumber = T.empty
+                 , _seNumber = T.empty
+                 , _spossession = T.empty
+                 , _swatched = T.empty
+                 }
+    title = _stitle
+    id_ = show . _sid
     addWork conn = execute conn "INSERT OR REPLACE INTO Series VALUES\
                                 \ (?,?,?,?,?,?,?,?,?)"
     cmpWork (Series i1 t1 o1 d1 y1 e1 s1 p1 w1) (Series i2 t2 o2 d2 y2 e2 s2 p2 w2) =
         Series
-            { sid = if i1 == -1 then i2 else i1
-            , stitle = compareFields t1 t2
-            , soriginalTitle = compareFields o1 o2
-            , sdirector = compareFields d1 d2
-            , syear = compareFields y1 y2
-            , epNumber = compareFields e1 e2
-            , seNumber = compareFields s1 s2
-            , spossession = compareFields p1 p2
-            , swatched = compareFields w1 w2
+            { _sid = if i1 == -1 then i2 else i1
+            , _stitle = compareFields t1 t2
+            , _soriginalTitle = compareFields o1 o2
+            , _sdirector = compareFields d1 d2
+            , _syear = compareFields y1 y2
+            , _epNumber = compareFields e1 e2
+            , _seNumber = compareFields s1 s2
+            , _spossession = compareFields p1 p2
+            , _swatched = compareFields w1 w2
             }
+    queryAll conn = query_ conn "SELECT * FROM Series"
     modWork conn n s = (addWork conn . cmpWork s . head) =<<
         (queryNamed conn "SELECT * FROM Series WHERE IdS = :id" [":id" := n] :: IO [Series])
-    replaceList (Series i t o d y e s p w) =  [ Replace "%index%" (show i)
+    replaceList (Series i t o d y e s p w) =  [ Replace "%index%" (T.pack $ show i)
                                              , Replace "%title%" t
                                              , Replace "%originalTitle%" o
                                              , Replace "%director%" d
@@ -139,6 +153,7 @@ listSeries s conn = query_ conn sql
                 Ids -> "SELECT IdS, Done, Title FROM Series"
 
 -- | Print a series
+-- | TODO
 printSeries :: Connection -> Int -> IO ()
 printSeries conn n =
     fetchSeries >>= putStrLn . printEmpty
@@ -147,41 +162,6 @@ printSeries conn n =
     fetchSeries = queryNamed conn sql [":id" := n]
     sql = "SELECT * FROM Series WHERE IdS = :id"
 
--- | Read the specified file, try to decode it. If it fails, print the error.
--- If it didn't fail, add each work to the database.
-importSeriesJSON :: Connection -> FilePath -> IO ()
-importSeriesJSON conn = BS.readFile >=> \j -> orPrint (eitherDecode j :: Either String [Series])
-                        $ mapM_ (addWork conn)
-
--- | Read the specified file, try to decode it. If it fails, print the error.
--- If it didn't fail, add each work to the database.
-importSeriesCSV :: Connection -> FilePath -> IO ()
-importSeriesCSV conn = BS.readFile >=> \c -> orPrint (C.decode C.HasHeader c :: Either String (Vector Series))
-                        $ mapM_ (addWork conn)
-
--- | Query the series, encode them and write them to the specified file.
-exportSeriesJSON :: Connection -> FilePath -> IO ()
-exportSeriesJSON conn file = BS.writeFile file . encodePretty =<< series
-    where
-        series = query_ conn "SELECT * FROM Series" :: IO [Series]
-
--- | Query the series, encode them and write them to the specified file.
-exportSeriesCSV :: Connection -> FilePath -> IO ()
-exportSeriesCSV conn file = BS.writeFile file . C.encode =<< series
-    where
-        series = query_ conn "SELECT * FROM Series" :: IO [Series]
-
 -- | Delete all rows from Series table
 purgeSeries :: Connection -> IO ()
 purgeSeries conn = execute_ conn "DELETE FROM Series"
-
--- | Convert each entry to a formatted string, and concatenate
-seriesToFullFormatted :: FilePath -> Connection -> IO String
-seriesToFullFormatted file conn = fmap concat . mapM toFormatted =<< series
-    where
-        toFormatted :: Series -> IO String
-        toFormatted = toFullFormatted template
-        template :: IO String
-        template = readFile file
-        series :: IO [Series]
-        series = query_ conn "SELECT * FROM Series"
