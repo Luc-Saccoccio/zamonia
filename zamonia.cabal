@@ -1,4 +1,9 @@
-cabal-version:  3.0
+cabal-version: 1.12
+
+-- This file has been generated from package.yaml by hpack version 0.35.0.
+--
+-- see: https://github.com/sol/hpack
+
 name:           zamonia
 version:        0.1.5.5
 description:    Please see the README on GitHub at <https://github.com/Luc-Saccoccio/zamonia>
@@ -13,32 +18,35 @@ build-type:     Simple
 extra-source-files:
     README.md
 
-source-repository head
-  type: git
-  location: https://github.com/Luc-Saccoccio/zamonia
-
 library
   exposed-modules:
-        Zamonia
-      , Zamonia.Work
-      , Zamonia.Film
-      , Zamonia.Series
-      , Zamonia.Book
+      Zamonia
   other-modules:
       Paths_zamonia
+      Zamonia.Work
+      Zamonia.Film
+      Zamonia.Series
+      Zamonia.Book
+      Zamonia.UI
+      Zamonia.UI.Internal
+      Zamonia.UI.Series
+      Zamonia.UI.App
   hs-source-dirs:
       src
   build-depends:
-      base >=4.7 && <5
-    , aeson
-    , aeson
+      aeson
     , aeson-pretty
+    , base >=4.7 && <5
+    , brick
     , bytestring
     , cassava
-    , text-replace
+    , microlens
+    , microlens-th
     , sqlite-simple
     , text
+    , text-replace
     , vector
+    , vty
   default-language: Haskell2010
 
 executable zamonia
@@ -50,23 +58,10 @@ executable zamonia
   ghc-options: -Wall -threaded -O2 -rtsopts -with-rtsopts=-N
   build-depends:
       base >=4.7 && <5
+    , cassava
+    , directory
     , optparse-applicative
     , sqlite-simple
     , text
-    , cassava
-    , directory
-    , zamonia
-  default-language: Haskell2010
-
-test-suite zamonia-test
-  type: exitcode-stdio-1.0
-  main-is: Spec.hs
-  other-modules:
-      Paths_zamonia
-  hs-source-dirs:
-      test
-  ghc-options: -threaded -rtsopts -with-rtsopts=-N
-  build-depends:
-      base >=4.7 && <5
     , zamonia
   default-language: Haskell2010
