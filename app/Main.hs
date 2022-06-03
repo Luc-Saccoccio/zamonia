@@ -225,7 +225,7 @@ usage = subparser $
 runFilms :: FilmsCommand -> IO ()
 runFilms (FAdd    f    ) = connection $ flip addWork f
 runFilms (FDelete n    ) = connection $ flip delFilm n
-runFilms (FPrint  n    ) = connection $ flip printFilm n
+runFilms (FPrint  n    ) = connection $ \c -> fetchFilm c n >>= printWork
 runFilms (FModify n f  ) = connection $ \c -> modWork c n f
 runFilms (FImportJSON f) = connection $ \c -> importJSON (Proxy @Film) c f
 runFilms (FImportCSV  f) = connection $ \c -> importCSV (Proxy @Film) c f
@@ -243,7 +243,7 @@ runFilms _ = putStrLn "Not implemented yet"
 runSeries :: SeriesCommand -> IO ()
 runSeries (SAdd    f    ) = connection $ \c -> addWork c f
 runSeries (SDelete n    ) = connection $ \c -> delSeries c n
-runSeries (SPrint  n    ) = connection $ flip printSeries n
+runSeries (SPrint  n    ) = connection $ \c -> fetchSeries c n >>= printWork
 runSeries (SModify n s  ) = connection $ \c -> modWork c n s
 runSeries (SImportJSON f) = connection $ \c -> importJSON (Proxy @Series) c f
 runSeries (SImportCSV  f) = connection $ \c -> importCSV (Proxy @Series) c f
@@ -261,7 +261,7 @@ runSeries _ = putStrLn "Not implemented yet"
 runBooks :: BooksCommand -> IO ()
 runBooks (BAdd    f    ) = connection $ \c -> addWork c f
 runBooks (BDelete n    ) = connection $ \c -> delBook c n
-runBooks (BPrint  n    ) = connection $ flip printBook n
+runBooks (BPrint  n    ) = connection $ \c -> fetchBook c n >>= printWork
 runBooks (BModify n s  ) = connection $ \c -> modWork c n s
 runBooks (BImportJSON f) = connection $ \c -> importJSON (Proxy @Book) c f
 runBooks (BImportCSV  f) = connection $ \c -> importCSV (Proxy @Book) c f

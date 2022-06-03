@@ -19,9 +19,9 @@ module Zamonia
   , delFilm
   , delSeries
   , delBook
-  , printFilm
-  , printSeries
-  , printBook
+  , fetchFilm
+  , fetchSeries
+  , fetchBook
   , addWork
   , modWork
   , importCSV
@@ -29,6 +29,7 @@ module Zamonia
   , exportCSV
   , exportJSON
   , allToFullFormatted
+  , printWork
   , purgeFilms
   , purgeSeries
   , purgeBooks

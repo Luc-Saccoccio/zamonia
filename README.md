@@ -4,7 +4,7 @@
 
 1. I have no idea what I'm doing, but I'm doing it. Suggestions about code style are of course welcome.
 2. Don't expect anything from this tool, neither stability nor consistent update schedule
-3. Consequently, do not expect Windows/MacOS support. Do it yourself if you want it, I'm making this tool for me. The same goes for other features.
+3. Consequently, do not expect Windows/MacOS support. Do it yourself if you want it, I'm making this tool for me.
 
 ## Installation
 
@@ -41,8 +41,6 @@ There is 11 subcommands:
 ### Formatted output
 
 Using the subcommand `export-formatted`, you can export **the entire table** (e.g. Films or Series) to a text document by providing a template. The template is used for each entry in the table. There are keywords for each field in the table, and they can be used more than one time (or not at all).
-
-If the update consists of the addition of a table, `zamonia init` is sufficient.
 
 #### Example
 
@@ -103,9 +101,10 @@ $ source <(zamonia --bash-completion-script `which zamonia`)
 
 ## TODO
 
-- [ ] Add a TUI
+- [~] Add a TUI
 - [ ] Simplify option parsing (too much code for that)
 - [ ] Add Search
-- [ ] Modify printWork functions to return `(Work w => IO w)` instead of `IO ()` so it can be used in Zamonia.UI.*
+- [ ] Modify printWork functions to return `(Work w => IO w)` instead of `IO ()` so it can be used in Zamonia.UI
 - [ ] Add support for video games
 - [ ] Commit. Else, it's gonna be incomprehensible
+- [ ] Make appstate cary its `connection` Also store series/movies/so on differently ? Or requery ? idk
