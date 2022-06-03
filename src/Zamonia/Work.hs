@@ -70,6 +70,10 @@ printEmpty :: Show a => [a] -> String
 printEmpty []    = "The index you asked for is empty"
 printEmpty (x:_) = show x
 
+-- | TODO
+printWork :: Show a => [a] -> IO ()
+printWork = putStrLn . printEmpty
+
 -- | Don't want to import (or even have as a dependency) Control.Lens, so redefining (??)
 (??) :: Functor f => f (a -> b) -> a -> f b
 fab ?? a = fmap ($ a) fab

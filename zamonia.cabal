@@ -28,16 +28,13 @@ library
       Zamonia.Series
       Zamonia.Book
       Zamonia.UI
-      Zamonia.UI.Internal
-      Zamonia.UI.Series
-      Zamonia.UI.App
   hs-source-dirs:
       src
   build-depends:
       aeson
     , aeson-pretty
     , base >=4.7 && <5
-    , brick
+    , brick >=0.64
     , bytestring
     , cassava
     , microlens

@@ -1,3 +1,4 @@
 resolver: lts-18.26
 extra-deps:
   - text-replace-0.1.0.1
+  - brick-0.68

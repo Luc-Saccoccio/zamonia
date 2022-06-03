@@ -147,15 +147,11 @@ listBooks s conn = query_ conn sql
                 Done -> "SELECT ISBN, Done, Title FROM Books ORDER BY Done" -- Sorting by watching state
                 Ids -> "SELECT ISBN, Done, Title FROM Books" -- Default sort => by index
 
--- | Print a book (print, ahah :D)
-printBook :: Connection -> Int -> IO ()
-printBook conn n =
-    fetchBooks >>= putStrLn . printEmpty
-  where
-    fetchBooks :: IO [Book]
-    fetchBooks = queryNamed conn sql [":id" := n]
-    sql :: Query
-    sql = "SELECT * FROM Books WHERE ISBN = :id"
+fetchBook :: Connection -> Int -> IO [Book]
+fetchBook conn n = queryNamed conn sql [":id" := n]
+    where
+        sql :: Query
+        sql = "SELECT * FROM Books WHERE ISBN = :id"
 
 -- | Delete all entries in Books table
 purgeBooks :: Connection -> IO ()

@@ -152,15 +152,9 @@ listSeries s conn = query_ conn sql
                 Done -> "SELECT IdS, Done, Title FROM Series ORDER BY Done"
                 Ids -> "SELECT IdS, Done, Title FROM Series"
 
--- | Print a series
--- | TODO
-printSeries :: Connection -> Int -> IO ()
-printSeries conn n =
-    fetchSeries >>= putStrLn . printEmpty
-        where
-    fetchSeries :: IO [Series]
-    fetchSeries = queryNamed conn sql [":id" := n]
-    sql = "SELECT * FROM Series WHERE IdS = :id"
+fetchSeries :: Connection -> Int -> IO [Series]
+fetchSeries conn n = queryNamed conn sql [":id" := n]
+    where sql = "SELECT * FROM Series WHERE IdS = :id"
 
 -- | Delete all rows from Series table
 purgeSeries :: Connection -> IO ()

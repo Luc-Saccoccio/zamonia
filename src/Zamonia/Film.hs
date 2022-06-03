@@ -140,15 +140,11 @@ listFilms s conn = query_ conn sql
                 Done -> "SELECT IdF, Done, Title FROM Films ORDER BY Done" -- Sorting by watching state
                 Ids -> "SELECT IdF, Done, Title FROM Films" -- Default sort => by index
 
--- | Print a film
-printFilm :: Connection -> Int -> IO ()
-printFilm conn n =
-    fetchFilms >>= putStrLn . printEmpty
-  where
-    fetchFilms :: IO [Film]
-    fetchFilms = queryNamed conn sql [":id" := n]
-    sql :: Query
-    sql = "SELECT * FROM Films WHERE IdF = :id"
+fetchFilm :: Connection -> Int -> IO [Film]
+fetchFilm conn n = queryNamed conn sql [":id" := n]
+    where
+        sql :: Query
+        sql = "SELECT * FROM Films WHERE IdF = :id"
 
 -- | Delete all entries in Films table
 purgeFilms :: Connection -> IO ()
