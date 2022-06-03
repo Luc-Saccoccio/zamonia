@@ -23,9 +23,6 @@ library:
       - Zamonia.Series
       - Zamonia.Book
       - Zamonia.UI
-      - Zamonia.UI.Internal
-      - Zamonia.UI.Series
-      - Zamonia.UI.App
   dependencies:
     - base >=4.7 && <5
     - aeson
@@ -36,7 +33,7 @@ library:
     - text-replace
     - sqlite-simple
     - text
-    - brick
+    - brick >= 0.64
     - vector
     - vty
     - microlens
