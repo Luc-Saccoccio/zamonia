@@ -1,15 +1,13 @@
-{-# LANGUAGE OverloadedStrings #-}
-{-# LANGUAGE TemplateHaskell   #-}
+{-# LANGUAGE OverloadedStrings   #-}
+{-# LANGUAGE TemplateHaskell     #-}
 module Zamonia.UI
     where
-
-import Control.Concurrent
 
 import           Brick
 import qualified Brick.Focus            as F
 import           Brick.Forms            (Form, editShowableField, editTextField,
-                                         formFocus, formState, newForm,
-                                         renderForm, (@@=), handleFormEvent, formFocus)
+                                         formFocus, formState, handleFormEvent,
+                                         newForm, renderForm, (@@=))
 import qualified Brick.Forms            as Forms
 import           Brick.Main             (continue, continueWithoutRedraw)
 import qualified Brick.Types            as T
@@ -23,7 +21,6 @@ import           Control.Monad          (void)
 import           Control.Monad.IO.Class (liftIO)
 import           Data.Functor           ((<&>))
 import           Data.Maybe             (fromJust, isJust)
-import           Data.Proxy
 import qualified Data.Text              as T
 import qualified Data.Vector            as Vec
 import qualified Graphics.Vty           as V
@@ -36,7 +33,7 @@ import           Zamonia.Work           (Work, new)
 makeLenses ''Series
 
 -- | (Index, Status, Name)
-type ListSeries = (Int, String, String)
+type ListItem = (Int, String, String)
 
 type SeriesForm e = Form Series e ResourceName
 
@@ -60,15 +57,18 @@ data ResourceName = Id -- ^ ID or ISBN
 formResources :: [ResourceName]
 formResources = [Id, Author, EpNumber, OriginalTitle, Possession, Publisher, SeNumber, Status, Title, Year]
 
-mainFocusList :: F.FocusRing ResourceName
-mainFocusList = F.focusRing [SeriesTable, FilmsTable, BooksTable]
+mainFocusList :: [ResourceName]
+mainFocusList = [SeriesTable, FilmsTable, BooksTable]
+
+mainFocusRing :: F.FocusRing ResourceName
+mainFocusRing = F.focusRing mainFocusList
 
 data AppState e = AppState
   { _focusRing   :: F.FocusRing ResourceName
-  , _seriesTable :: L.List ResourceName ListSeries
+  , _seriesTable :: L.List ResourceName ListItem
+  , _filmTable :: L.List ResourceName ListItem
   , _form        :: Maybe (WorkForm e)
-  {- , _filmTable :: Page
-  , _help :: Maybe (D.Dialog HelpChoice)
+  {- , _help :: Maybe (D.Dialog HelpChoice)
   , _bookTable :: Page -}
   }
 
@@ -122,8 +122,8 @@ infoWidget =
   <=> str "P: purge "
   <+> fill ' '
 
-drawSeriesList :: L.List ResourceName ListSeries -> Widget ResourceName
-drawSeriesList l = ui
+drawList :: L.List ResourceName ListItem -> Widget ResourceName
+drawList l = ui
     where
         label = str "[Series] - Films - Books"
         header = withAttr "listHeader" $ str " Id  Name" <+> strWrap " " <+> str "Status"
@@ -131,23 +131,29 @@ drawSeriesList l = ui
           case L.listSelectedElement l of
             Nothing -> fill ' '
             Just (_, (i, s, n)) -> str (show i) <=> str n <=> str s <+> fill ' '
-        ui = joinBorders . B.borderWithLabel label $ header <=> L.renderList drawSeries True l
+        ui = joinBorders . B.borderWithLabel label $ header <=> L.renderList drawElem True l
                 <=> B.hBorder
                 <=> vLimit 10 (hLimitPercent 50 seriesInfo
                     <+> B.vBorder
                     <+> hLimitPercent 50 infoWidget)
 
-drawSeries :: Bool -> ListSeries -> Widget ResourceName
-drawSeries _ s =
+drawElem :: Bool -> ListItem -> Widget ResourceName
+drawElem _ s =
     let (index, status, name) = s
-        f x = replicate (3 - length x) ' ' ++ x
-     in str (f $ show index) <+> str ": " <+> str name <+> strWrap " " <+> str status
+        f x = replicate (3 - length x) ' ' ++ x ++ ": "
+     in str (f $ show index) <+> str name <+> strWrap " " <+> str status
 
-initialSeriesList :: [ListSeries] -> L.List ResourceName ListSeries
-initialSeriesList series = L.list SeriesTable (Vec.fromList series) 1
+initialList :: [ListItem] -> L.List ResourceName ListItem
+initialList l = L.list SeriesTable (Vec.fromList l) 1
 
-toSeriesForm :: AppState e -> T.EventM ResourceName (T.Next (AppState e))
-toSeriesForm state =
+toSeriesForm :: Bool -> AppState e -> T.EventM ResourceName (T.Next (AppState e))
+toSeriesForm empty state =
+  if empty then
+        let newForm = seriesForm new in
+        continue $ state
+          & focusRing .~ formFocus newForm
+          & form ?~ S newForm
+  else
   case L.listSelectedElement (state^.seriesTable) of
     Nothing             -> continueWithoutRedraw state
     Just (_, (n, _, _)) ->
@@ -166,11 +172,16 @@ handleEvent state ev =
   in
   case (focus, ev) of
     (_, VtyEvent (V.EvKey (V.KChar 'c') [V.MCtrl])) -> halt state
-    -- (_, VtyEvent (V.EvKey (V.KChar '\t') []))       -> continue $ state & focusRing %~ F.focusNext
-    (Just SeriesTable, VtyEvent (V.EvKey (V.KChar 'e') []))  -> toSeriesForm state
+    (Just f, VtyEvent (V.EvKey V.KRight []))
+      | f `elem` mainFocusList -> continue $ state & focusRing %~ F.focusNext
+    (Just f, VtyEvent (V.EvKey V.KLeft []))       -> continue $ state & focusRing %~ F.focusPrev
+    (Just SeriesTable, VtyEvent (V.EvKey (V.KChar 'q') []))  -> halt state
     (Just SeriesTable, VtyEvent (V.EvKey V.KEsc [])) -> halt state
+    (Just SeriesTable, VtyEvent (V.EvKey (V.KChar 'a') []))  -> toSeriesForm True state
+    (Just SeriesTable, VtyEvent (V.EvKey (V.KChar 'e') []))  -> toSeriesForm False state
     (Just SeriesTable, VtyEvent ev) -> continue =<< seriesTable (handleListEventVi handleListEvent ev) state
-    (Just s, VtyEvent (V.EvKey V.KEsc []))               -> continue (state & form.~ Nothing & focusRing .~ mainFocusList)
+    (Just FilmsTable, VtyEvent ev) -> continue =<< filmTable (handleListEventVi handleListEvent ev) state
+    (Just s, VtyEvent (V.EvKey V.KEsc []))               -> continue (state & form.~ Nothing & focusRing .~ mainFocusRing)
     (Just f, VtyEvent (V.EvKey V.KEnter []))             ->
       if f `elem` formResources then
                                 let currentForm = fromJust (state^.form)
@@ -180,7 +191,7 @@ handleEvent state ev =
                                          in liftIO (connection (`addWork` result))
                                               >> continue (state
                                                             & form .~ Nothing
-                                                            & focusRing .~ mainFocusList)
+                                                            & focusRing .~ mainFocusRing)
                                 else continue state
     _                                               -> do
                                                         let f (S x) = x
@@ -190,10 +201,11 @@ handleEvent state ev =
 
 drawUI :: AppState e -> [Widget ResourceName]
 drawUI state = case currentFocus of
-                 Just SeriesTable -> [drawSeriesList (state^.seriesTable)]
+                 Just SeriesTable -> [drawList (state^.seriesTable)]
+                 Just FilmsTable -> [drawList (state^.filmTable)]
                  _ ->
                      case currentForm of
-                       Just (S sf) -> [drawForm sf, drawSeriesList (state^.seriesTable)]
+                       Just (S sf) -> [drawForm sf, drawList (state^.seriesTable)]
                        _ -> error "Impossible"
     where
         currentFocus = F.focusGetCurrent (state^.focusRing)
@@ -206,14 +218,16 @@ appCursor state =
     _      -> F.focusRingCursor (^.focusRing) state
 
 initState :: IO (AppState e)
-initState = seriesTable s $ AppState
+initState = filmTable f =<< (seriesTable s $ AppState
   {
-    _focusRing = mainFocusList
+    _focusRing = mainFocusRing
   , _seriesTable = undefined -- Not very clean
+  , _filmTable = undefined
   , _form = Nothing
-  }
+  })
     where
-      s _ = connection $ \c -> listSeries Names c <&> initialSeriesList
+      s _ = connection $ \c -> listSeries Names c <&> initialList
+      f _ = connection $ \c -> listFilms Names c <&> initialList
 
 app :: App (AppState e) e ResourceName
 app =

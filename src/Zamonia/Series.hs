@@ -99,7 +99,7 @@ instance Show Series where
     \\ESC[1;37mWatched:\ESC[m %s" t o d y e s p w
 
 instance Work Series where
-    new = Series { _sid = -1
+    new = Series { _sid = 0
                  , _stitle = T.empty
                  , _soriginalTitle = T.empty
                  , _sdirector = T.empty
