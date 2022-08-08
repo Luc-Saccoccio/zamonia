@@ -11,9 +11,9 @@ import           Database.SQLite.Simple
 import           Options.Applicative
 import           System.Directory       (createDirectoryIfMissing)
 import           Text.Printf
-import           Zamonia
+import qualified Zamonia.UI (main)
 
-data Usage = Init
+{- data Usage = Init
            | Films FilmsCommand
            | Series' SeriesCommand
            | Books BooksCommand
@@ -200,12 +200,12 @@ subCommandsBooks = subparser $
            <> command "purge"  (info (pure BPurge) (progDesc "Purge all rows from table in database"))
            <> command "search" (info (helper <*> search) (progDesc "Search keyword in database"))
                where
-                   add       = BAdd    <$> (Book <$> isbn <*> strArgument (metavar "TITLE" <> help "Title of the book you want to add")
+                   add       = BAdd    <$> (Book <$> index <*> isbn <*> strArgument (metavar "TITLE" <> help "Title of the book you want to add")
                                                     <*> original <*> author <*> publisher <*> year <*> possession <*> watched)
                    del       = BDelete <$> argument auto (metavar "INDEX" <> help "Index to delete, must be an integer")
                    shw       = BPrint  <$> argument auto (metavar "INDEX" <> help "Index to show, must be an integer")
                    mdf       = BModify <$> index
-                                        <*> (Book <$> isbn <*> tTitle <*> original <*> author <*> publisher
+                                        <*> (Book <$> index <*> isbn <*> tTitle <*> original <*> author <*> publisher
                                                         <*> year <*> possession <*> watched)
                    imc       = BImportCSV <$> importFileCSV
                    imj       = BImportJSON <$> importFileJSON
@@ -225,7 +225,7 @@ usage = subparser $
 runFilms :: FilmsCommand -> IO ()
 runFilms (FAdd    f    ) = connection $ flip addWork f
 runFilms (FDelete n    ) = connection $ flip delFilm n
-runFilms (FPrint  n    ) = connection $ \c -> fetchFilm c n >>= printWork
+-- runFilms (FPrint  n    ) = connection $ \c -> fetchWork c n >>= printWork
 runFilms (FModify n f  ) = connection $ \c -> modWork c n f
 runFilms (FImportJSON f) = connection $ \c -> importJSON (Proxy @Film) c f
 runFilms (FImportCSV  f) = connection $ \c -> importCSV (Proxy @Film) c f
@@ -243,7 +243,7 @@ runFilms _ = putStrLn "Not implemented yet"
 runSeries :: SeriesCommand -> IO ()
 runSeries (SAdd    f    ) = connection $ \c -> addWork c f
 runSeries (SDelete n    ) = connection $ \c -> delSeries c n
-runSeries (SPrint  n    ) = connection $ \c -> fetchSeries c n >>= printWork
+-- runSeries (SPrint  n    ) = connection $ \c -> fetchWork c n >>= printWork
 runSeries (SModify n s  ) = connection $ \c -> modWork c n s
 runSeries (SImportJSON f) = connection $ \c -> importJSON (Proxy @Series) c f
 runSeries (SImportCSV  f) = connection $ \c -> importCSV (Proxy @Series) c f
@@ -261,7 +261,7 @@ runSeries _ = putStrLn "Not implemented yet"
 runBooks :: BooksCommand -> IO ()
 runBooks (BAdd    f    ) = connection $ \c -> addWork c f
 runBooks (BDelete n    ) = connection $ \c -> delBook c n
-runBooks (BPrint  n    ) = connection $ \c -> fetchBook c n >>= printWork
+-- runBooks (BPrint  n    ) = connection $ \c -> fetchWork c n >>= printWork
 runBooks (BModify n s  ) = connection $ \c -> modWork c n s
 runBooks (BImportJSON f) = connection $ \c -> importJSON (Proxy @Book) c f
 runBooks (BImportCSV  f) = connection $ \c -> importCSV (Proxy @Book) c f
@@ -310,11 +310,14 @@ main = do
                                                         \ , Possession    TEXT\
                                                         \ , Done          TEXT)"
                     >> execute_ c
-                        "CREATE TABLE IF NOT EXISTS Books (ISBN TEXT PRIMARY KEY\
+                        "CREATE TABLE Books (IdB INTEGER PRIMARY KEY\
+                                                       \ , ISBN          TEXT\
                                                        \ , Title         TEXT\
                                                        \ , OriginalTitle TEXT\
                                                        \ , Author        TEXT\
                                                        \ , Publisher     TEXT\
                                                        \ , Year          TEXT\
                                                        \ , Possession    TEXT\
-                                                       \ , Done          TEXT)")
+                                                       \ , Done          TEXT)") -}
+main :: IO ()
+main = Zamonia.UI.main

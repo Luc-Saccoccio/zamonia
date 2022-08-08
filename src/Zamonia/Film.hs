@@ -88,9 +88,9 @@ instance ToRow Film where
 
 -- | Better Show instance => Pretty Print of a Film
 instance Show Film where
-    show (Film _ t o d y p w) = printf "\ESC[1;37mTitle:\ESC[m %s\n\ESC[1;37mOriginal Title:\ESC[m %s\n\ESC[1;37mDirector:\ESC[m %s\n\
-    \\ESC[1;37mYear of release:\ESC[m %s\n\ESC[1;37mPossession:\ESC[m %s\n\
-    \\ESC[1;37mWatched:\ESC[m %s" t o d y p w
+    show (Film _ t o d y p w) = printf "Title: %s\nOriginal Title: %s\nDirector: %s\n\
+    \Year of release: %s\nPossession: %s\n\
+    \Watched: %s" t o d y p w
 
 instance Work Film where
     new = Film { _fid = -1
@@ -102,7 +102,8 @@ instance Work Film where
                , _fwatched = T.empty
                }
     title = _ftitle
-    id_ = show . _fid
+    status = _fwatched
+    id_ = _fid
     addWork conn = execute conn "INSERT OR REPLACE INTO Films VALUES\
                                 \ (?,?,?,?,?,?,?)"
     cmpWork (Film i1 t1 o1 d1 y1 p1 w1) (Film i2 t2 o2 d2 y2 p2 w2) =
@@ -116,6 +117,10 @@ instance Work Film where
             , _fwatched = compareFields w1 w2
             }
     queryAll conn = query_ conn "SELECT * FROM Films"
+    fetchWork conn n = queryNamed conn sql [":id" := n]
+      where
+        sql :: Query
+        sql = "SELECT * FROM Films WHERE IdF = :id"
     modWork conn n f = (addWork conn . cmpWork f . head) =<<
         (queryNamed conn "SELECT * FROM Films WHERE IdF = :id" [":id" := n] :: IO [Film])
     replaceList (Film i t o d y p w) = [ Replace "%index%" (T.pack $ show i)
@@ -131,7 +136,7 @@ delFilm :: Connection -> Int -> IO ()
 delFilm conn n = execute conn "DELETE FROM Films WHERE IdF = ?" (Only n)
 
 -- | Return a list of all films, sorted the way asked
-listFilms :: Sort -> Connection -> IO [(Int, String, String)]
+listFilms :: Sort -> Connection -> IO [(Int, T.Text, T.Text)]
 listFilms s conn = query_ conn sql
     where
         sql :: Query
@@ -139,12 +144,6 @@ listFilms s conn = query_ conn sql
                 Names -> "SELECT IdF, Done, Title FROM Films ORDER BY Title" -- Sorting by name
                 Done -> "SELECT IdF, Done, Title FROM Films ORDER BY Done" -- Sorting by watching state
                 Ids -> "SELECT IdF, Done, Title FROM Films" -- Default sort => by index
-
-fetchFilm :: Connection -> Int -> IO [Film]
-fetchFilm conn n = queryNamed conn sql [":id" := n]
-    where
-        sql :: Query
-        sql = "SELECT * FROM Films WHERE IdF = :id"
 
 -- | Delete all entries in Films table
 purgeFilms :: Connection -> IO ()

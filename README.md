@@ -104,7 +104,7 @@ $ source <(zamonia --bash-completion-script `which zamonia`)
 - [~] Add a TUI
 - [ ] Simplify option parsing (too much code for that)
 - [ ] Add Search
-- [ ] Modify printWork functions to return `(Work w => IO w)` instead of `IO ()` so it can be used in Zamonia.UI
 - [ ] Add support for video games
-- [ ] Commit. Else, it's gonna be incomprehensible
-- [ ] Make appstate cary its `connection` Also store series/movies/so on differently ? Or requery ? idk
+- [ ] (in UI) Store series/movies/so on differently ? Or requery ? idk
+- [ ] Add comments to the code
+- [ ] Review **every** `case` in Zamonia.UI and see if Proxies can help

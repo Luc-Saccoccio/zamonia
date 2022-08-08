@@ -17,7 +17,8 @@ import           Zamonia.Work
 
 -- | Structure representing a book
 data Book = Book
-    { _bisbn          :: T.Text -- ^ ISBN
+    { _bid            :: Int    -- ^ ID
+    , _bisbn          :: T.Text -- ^ ISBN
     , _btitle         :: T.Text -- ^ Title
     , _boriginalTitle :: T.Text -- ^ Original Title
     , _bauthor        :: T.Text -- ^ Author
@@ -45,6 +46,7 @@ data BooksCommand =
 -- | Instance to allow parsing JSON for Book
 instance FromJSON Book where
     parseJSON (Object v) = Book <$>
+        v .: "id" <*>
         v .: "isbn" <*>
         v .: "title" <*>
         v .: "originalTitle" <*>
@@ -57,8 +59,9 @@ instance FromJSON Book where
 
 -- | Instance to allow transforming a Book to a JSON entry
 instance ToJSON Book where
-    toJSON (Book isbn title originalTitle author publisher year possession watched)
-      = object [ "isbn" .= isbn
+    toJSON (Book bid isbn title originalTitle author publisher year possession watched)
+      = object [ "id" .= bid
+               , "isbn" .= isbn
                , "title" .= title
                , "originalTitle" .= originalTitle
                , "author" .= author
@@ -72,31 +75,32 @@ instance C.FromRecord Book where
     parseRecord v
         | length v >= 9 = Book <$> v C..! 0 <*> v C..! 1 <*> v C..! 2 <*> v C..! 3
                                     <*> v C..! 4 <*> v C..! 5 <*> v C..! 6
-                                    <*> v C..! 7
+                                    <*> v C..! 7 <*> v C..! 8
         | otherwise = mzero -- Fail if the number of field if too low
 
 -- | Instance to allow transforming a Book to a CSV line
 instance C.ToRecord Book where
-    toRecord (Book is t o a pu y p w) = C.record [C.toField is, C.toField t,
+    toRecord (Book i is t o a pu y p w) = C.record [C.toField i, C.toField is, C.toField t,
         C.toField o, C.toField a, C.toField pu, C.toField y, C.toField p, C.toField w]
 
 -- | Instance to allow reading a row as a Book
 instance FromRow Book where
-  fromRow = Book <$> field <*> field <*> field
+  fromRow = Book <$> field <*> field <*> field <*> field
              <*> field <*> field <*> field <*> field <*> field
 
 -- | Instance to transform a book into a row
 instance ToRow Book where
-    toRow (Book is t o a pu y p w) = toRow (is, t, o, a, pu, y, p, w)
+    toRow (Book i is t o a pu y p w) = toRow (i, is, t, o, a, pu, y, p, w)
 
 -- | Better Show instance => Pretty Print of a Book
 instance Show Book where
-    show (Book is t o a pu y p r) = printf "\ESC[1;37mISBN:\ESC[m %s\n\ESC[1;37mTitle:\ESC[m %s\n\ESC[1;37mOriginal Title:\ESC[m %s\n\ESC[1;37mAuthor:\ESC[m %s\n\
-    \\ESC[1;37mPubliser:\ESC[m %s\n\ESC[1;37mYear of release:\ESC[m %s\n\ESC[1;37mPossession:\ESC[m %s\n\
-    \\ESC[1;37mRead:\ESC[m %s" is t o a pu y p r
+    show (Book _ is t o a pu y p r) = printf "ISBN: %s\nTitle: %s\nOriginal Title: %s\nAuthor: %s\n\
+    \Publiser: %s\nYear of release: %s\nPossession: %s\n\
+    \Read: %s" is t o a pu y p r
 
 instance Work Book where
-    new = Book { _bisbn = T.empty
+    new = Book { _bid = 0
+               , _bisbn = T.empty
                , _btitle = T.empty
                , _boriginalTitle = T.empty
                , _bauthor = T.empty
@@ -107,12 +111,14 @@ instance Work Book where
                }
 
     title = _btitle
-    id_ = show . _bisbn
+    status = _bread
+    id_ = _bid
     addWork conn = execute conn "INSERT OR REPLACE INTO Books VALUES\
                                 \ (?,?,?,?,?,?,?,?,?)"
-    cmpWork (Book is1 t1 o1 a1 pu1 y1 p1 w1) (Book is2 t2 o2 a2 pu2 y2 p2 w2) =
+    cmpWork (Book i1 is1 t1 o1 a1 pu1 y1 p1 w1) (Book i2 is2 t2 o2 a2 pu2 y2 p2 w2) =
         Book
-            { _bisbn = compareFields is1 is2
+            { _bid = if i2 == -1 then i1 else i2
+            , _bisbn = compareFields is1 is2
             , _btitle = compareFields t1 t2
             , _boriginalTitle = compareFields o1 o2
             , _bauthor = compareFields a1 a2
@@ -122,9 +128,14 @@ instance Work Book where
             , _bread = compareFields w1 w2
             }
     queryAll conn = query_ conn "SELECT * FROM Books"
+    fetchWork conn n = queryNamed conn sql [":id" := n]
+      where
+        sql :: Query
+        sql = "SELECT * FROM Books WHERE IdB = :id"
     modWork conn n f = (addWork conn . cmpWork f . head) =<<
         (queryNamed conn "SELECT * FROM Books WHERE ISBN = :id" [":id" := n] :: IO [Book])
-    replaceList (Book is t o a pu y p w) = [ Replace "%isbn%" is
+    replaceList (Book i is t o a pu y p w) = [ Replace "%index%" (T.pack $ show i)
+                                           , Replace "%isbn%" is
                                            , Replace "%title%" t
                                            , Replace "%originalTitle%" o
                                            , Replace "%author%" a
@@ -135,23 +146,17 @@ instance Work Book where
 
 -- | Delete the book matching the index
 delBook :: Connection -> Int -> IO ()
-delBook conn n = execute conn "DELETE FROM Books WHERE ISBN = ?" (Only n)
+delBook conn n = execute conn "DELETE FROM Books WHERE IdB = ?" (Only n)
 
 -- | Return a list of all books, sorted the way asked
-listBooks :: Sort -> Connection -> IO [(Int, String, String)]
+listBooks :: Sort -> Connection -> IO [(Int, T.Text, T.Text)]
 listBooks s conn = query_ conn sql
     where
         sql :: Query
         sql = case s of
-                Names -> "SELECT ISBN, Done, Title FROM Books ORDER BY Title" -- Sorting by name
-                Done -> "SELECT ISBN, Done, Title FROM Books ORDER BY Done" -- Sorting by watching state
-                Ids -> "SELECT ISBN, Done, Title FROM Books" -- Default sort => by index
-
-fetchBook :: Connection -> Int -> IO [Book]
-fetchBook conn n = queryNamed conn sql [":id" := n]
-    where
-        sql :: Query
-        sql = "SELECT * FROM Books WHERE ISBN = :id"
+                Names -> "SELECT IdB, Done, Title FROM Books ORDER BY Title" -- Sorting by name
+                Done -> "SELECT IdB, Done, Title FROM Books ORDER BY Done" -- Sorting by watching state
+                Ids -> "SELECT IdB, Done, Title FROM Books" -- Default sort => by index
 
 -- | Delete all entries in Books table
 purgeBooks :: Connection -> IO ()

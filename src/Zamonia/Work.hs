@@ -19,12 +19,16 @@ import           Text.Replace             (Replace, replaceWithList)
 
 class Work a where
     new :: a
+    status :: a -> T.Text
     title :: a -> T.Text -- ^ Title of the work
-    id_ :: a -> String -- ^ ID of the work
+    id_ :: a -> Int -- ^ ID of the work
+    listRepresentation :: a -> (Int, T.Text, T.Text)
+    listRepresentation w = (id_ w, status w, title w)
     modWork :: Connection -> Int -> a -> IO () -- ^ Modifying the informations of a work
     addWork :: Connection -> a -> IO () -- ^ Adding a work
     cmpWork :: a -> a -> a -- ^ Comparing two works
     queryAll :: Connection -> IO [a]
+    fetchWork :: Connection -> Int -> IO [a]
     replaceList :: a -> [Replace] -- ^ List containing replacing information for a specific work
     entryToFormatted :: L.Text -> a -> L.Text -- ^ Convert an entry to a formatted string
     entryToFormatted c w = replaceWithList (replaceList w) c
@@ -74,7 +78,6 @@ printEmpty (x:_) = show x
 printWork :: Show a => [a] -> IO ()
 printWork = putStrLn . printEmpty
 
--- | Don't want to import (or even have as a dependency) Control.Lens, so redefining (??)
 (??) :: Functor f => f (a -> b) -> a -> f b
 fab ?? a = fmap ($ a) fab
 

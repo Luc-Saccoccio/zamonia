@@ -19,9 +19,7 @@ module Zamonia
   , delFilm
   , delSeries
   , delBook
-  , fetchFilm
-  , fetchSeries
-  , fetchBook
+  , fetchWork
   , addWork
   , modWork
   , importCSV

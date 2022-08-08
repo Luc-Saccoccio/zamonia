@@ -94,9 +94,9 @@ instance ToRow Series where
 
 -- | Better Show instance => Pretty print of a Series
 instance Show Series where
-    show (Series _ t o d y e s p w) = printf "\ESC[1;37mTitle:\ESC[m %s\n\ESC[1;37mOriginal Title:\ESC[m %s\n\ESC[1;37mDirector:\ESC[m %s\n\
-    \\ESC[1;37mYear of release:\ESC[m %s\n\ESC[1;37mNumber of episodes:\ESC[m %s\n\ESC[1;37mNumber of seasons:\ESC[m %s\n\ESC[1;37mPossession:\ESC[m %s\n\
-    \\ESC[1;37mWatched:\ESC[m %s" t o d y e s p w
+    show (Series _ t o d y e s p w) = printf "Title: %s\nOriginal Title: %s\nDirector: %s\n\
+    \Year of release: %s\nNumber of episodes: %s\nNumber of seasons: %s\nPossession: %s\n\
+    \Watched: %s" t o d y e s p w
 
 instance Work Series where
     new = Series { _sid = 0
@@ -110,7 +110,8 @@ instance Work Series where
                  , _swatched = T.empty
                  }
     title = _stitle
-    id_ = show . _sid
+    status = _swatched
+    id_ = _sid
     addWork conn = execute conn "INSERT OR REPLACE INTO Series VALUES\
                                 \ (?,?,?,?,?,?,?,?,?)"
     cmpWork (Series i1 t1 o1 d1 y1 e1 s1 p1 w1) (Series i2 t2 o2 d2 y2 e2 s2 p2 w2) =
@@ -126,6 +127,8 @@ instance Work Series where
             , _swatched = compareFields w1 w2
             }
     queryAll conn = query_ conn "SELECT * FROM Series"
+    fetchWork conn n = queryNamed conn sql [":id" := n]
+      where sql = "SELECT * FROM Series WHERE IdS = :id"
     modWork conn n s = (addWork conn . cmpWork s . head) =<<
         (queryNamed conn "SELECT * FROM Series WHERE IdS = :id" [":id" := n] :: IO [Series])
     replaceList (Series i t o d y e s p w) =  [ Replace "%index%" (T.pack $ show i)
@@ -143,7 +146,7 @@ delSeries :: Connection -> Int -> IO ()
 delSeries conn n = execute conn "DELETE FROM Series WHERE IdS = ?" (Only n)
 
 -- | Return a list of all series, sorted the way asked
-listSeries :: Sort -> Connection -> IO [(Int, String, String)]
+listSeries :: Sort -> Connection -> IO [(Int, T.Text, T.Text)]
 listSeries s conn = query_ conn sql
     where
         sql :: Query
@@ -151,10 +154,6 @@ listSeries s conn = query_ conn sql
                 Names -> "SELECT IdS, Done, Title FROM Series ORDER BY Title"
                 Done -> "SELECT IdS, Done, Title FROM Series ORDER BY Done"
                 Ids -> "SELECT IdS, Done, Title FROM Series"
-
-fetchSeries :: Connection -> Int -> IO [Series]
-fetchSeries conn n = queryNamed conn sql [":id" := n]
-    where sql = "SELECT * FROM Series WHERE IdS = :id"
 
 -- | Delete all rows from Series table
 purgeSeries :: Connection -> IO ()

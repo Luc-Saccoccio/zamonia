@@ -1,5 +1,5 @@
 name: zamonia
-version:        0.1.5.5
+version:        0.2.0.0
 description:    Please see the README on GitHub at <https://github.com/Luc-Saccoccio/zamonia>
 homepage:       https://github.com/Luc-Saccoccio/zamonia
 bug-reports:    https://github.com/Luc-Saccoccio/zamonia/issues
@@ -16,13 +16,13 @@ library:
   source-dirs: src
   exposed-modules:
       - Zamonia
+      - Zamonia.UI
   other-modules:
       - Paths_zamonia
       - Zamonia.Work
       - Zamonia.Film
       - Zamonia.Series
       - Zamonia.Book
-      - Zamonia.UI
   dependencies:
     - base >=4.7 && <5
     - aeson

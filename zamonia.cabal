@@ -1,11 +1,11 @@
 cabal-version: 1.12
 
--- This file has been generated from package.yaml by hpack version 0.35.0.
+-- This file has been generated from package.yaml by hpack version 0.34.7.
 --
 -- see: https://github.com/sol/hpack
 
 name:           zamonia
-version:        0.1.5.5
+version:        0.2.0.0
 description:    Please see the README on GitHub at <https://github.com/Luc-Saccoccio/zamonia>
 homepage:       https://github.com/Luc-Saccoccio/zamonia
 bug-reports:    https://github.com/Luc-Saccoccio/zamonia/issues
@@ -21,13 +21,13 @@ extra-source-files:
 library
   exposed-modules:
       Zamonia
+      Zamonia.UI
   other-modules:
       Paths_zamonia
       Zamonia.Work
       Zamonia.Film
       Zamonia.Series
       Zamonia.Book
-      Zamonia.UI
   hs-source-dirs:
       src
   build-depends:
