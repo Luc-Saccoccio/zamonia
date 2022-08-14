@@ -28,21 +28,6 @@ data Book = Book
     , _bread          :: T.Text -- ^ Yes/No
     } deriving Eq
 
--- | Commands related to books
-data BooksCommand =
-            BAdd Book
-             | BDelete Int
-             | BPrint Int
-             | BModify Int Book
-             | BSearch String String
-             | BImportCSV FilePath
-             | BImportJSON FilePath
-             | BExportJSON FilePath
-             | BExportCSV FilePath
-             | BExportFormatted FilePath FilePath
-             | BList Sort
-             | BPurge
-
 -- | Instance to allow parsing JSON for Book
 instance FromJSON Book where
     parseJSON (Object v) = Book <$>

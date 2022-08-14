@@ -28,21 +28,6 @@ data Series = Series -- ^ Structure representing a series
     , _swatched       :: T.Text -- ^ Yes/No
     } deriving Eq
 
--- | Commands related to series
-data SeriesCommand =
-            SAdd Series
-             | SDelete Int
-             | SPrint Int
-             | SModify Int Series
-             | SSearch String String
-             | SImportCSV FilePath
-             | SImportJSON FilePath
-             | SExportJSON FilePath
-             | SExportCSV FilePath
-             | SExportFormatted FilePath FilePath
-             | SList Sort
-             | SPurge
-
 -- | Instance to allow parsing JSON for Series
 instance FromJSON Series where
     parseJSON (Object v) = Series <$>

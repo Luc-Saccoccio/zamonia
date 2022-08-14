@@ -1,10 +1,11 @@
 {-# LANGUAGE OverloadedStrings   #-}
+{-# LANGUAGE TypeApplications    #-}
 {-# LANGUAGE ScopedTypeVariables #-}
 module Zamonia.Work
     where
 
 import           Control.Monad            ((>=>))
-import           Data.Aeson               (FromJSON, ToJSON, eitherDecode)
+import           Data.Aeson               (FromJSON, ToJSON, eitherDecode')
 import           Data.Aeson.Encode.Pretty (encodePretty)
 import qualified Data.ByteString.Lazy     as BS (readFile, writeFile)
 import           Data.Csv                 (FromRecord, HasHeader (..), ToRecord,
@@ -38,7 +39,7 @@ class Work a where
 -- | Read the specified file, try to decode it. If it fails, print the error.
 -- If it didn't fail, add each entry to the database.
 importJSON :: (Work work, FromJSON work) => proxy work -> Connection -> FilePath -> IO ()
-importJSON (_ :: proxy work) conn = BS.readFile >=> \j -> orPrint (eitherDecode j :: Either String [work])
+importJSON (_ :: proxy work) conn = BS.readFile >=> \j -> orPrint (eitherDecode' j :: Either String [work])
                         $ mapM_ (addWork conn)
 
 -- | Read the specified file, try to decode it. If it fails, print the error.
@@ -54,10 +55,10 @@ exportCSV (_ :: proxy work) conn file = BS.writeFile file . encode =<< (queryAll
 
 -- | Convert each entry to a formatted string, and concatenate
 allToFullFormatted :: Work work => proxy work -> FilePath -> Connection -> IO L.Text
-allToFullFormatted (_ :: proxy work) file conn = fmap L.concat . mapM (toFormatted :: work -> IO L.Text) =<< queryAll conn
+allToFullFormatted (_ :: proxy work) file conn = fmap L.concat . mapM toFormatted =<< queryAll conn
     where
         -- toFormatted :: Work a => a -> IO L.Text
-        toFormatted = toFullFormatted template
+        toFormatted = toFullFormatted @work template
         template :: IO L.Text
         template = L.pack <$> readFile file
 
@@ -79,7 +80,7 @@ printWork :: Show a => [a] -> IO ()
 printWork = putStrLn . printEmpty
 
 (??) :: Functor f => f (a -> b) -> a -> f b
-fab ?? a = fmap ($ a) fab
+f ?? a = fmap ($ a) f
 
 -- | Types of sort
 data Sort = Ids

@@ -6,6 +6,7 @@
 {-# LANGUAGE TupleSections       #-}
 {-# LANGUAGE TypeApplications    #-}
 module Zamonia.UI
+  (main)
     where
 
 import           Brick
@@ -110,7 +111,7 @@ attributesMap = attrMap V.defAttr
   , (L.listSelectedAttr, V.blue `on` V.black)
   , (D.dialogAttr, V.white `on` V.black)
   , (D.buttonAttr, V.black `on` V.white)
-  , (D.buttonSelectedAttr, bg V.brightBlue)
+  , (D.buttonSelectedAttr, V.black `on` V.yellow)
   , ("listHeader", V.withStyle (V.yellow `on` V.black) V.bold)
   , ("windowTop", V.withStyle (V.green `on` V.black) V.bold)
   ]

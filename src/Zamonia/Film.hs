@@ -27,21 +27,6 @@ data Film = Film
     , _fwatched       :: T.Text -- ^ Yes/No
     } deriving Eq
 
--- | Commands related to films
-data FilmsCommand =
-            FAdd Film
-             | FDelete Int
-             | FPrint Int
-             | FModify Int Film
-             | FSearch String String
-             | FImportCSV FilePath
-             | FImportJSON FilePath
-             | FExportJSON FilePath
-             | FExportCSV FilePath
-             | FExportFormatted FilePath FilePath
-             | FList Sort
-             | FPurge
-
 -- | Instance to allow parsing JSON for Film
 instance FromJSON Film where
     parseJSON (Object v) = Film <$>

@@ -5,7 +5,7 @@ cabal-version: 1.12
 -- see: https://github.com/sol/hpack
 
 name:           zamonia
-version:        0.2.0.0
+version:        0.2.0.1
 description:    Please see the README on GitHub at <https://github.com/Luc-Saccoccio/zamonia>
 homepage:       https://github.com/Luc-Saccoccio/zamonia
 bug-reports:    https://github.com/Luc-Saccoccio/zamonia/issues
@@ -30,6 +30,8 @@ library
       Zamonia.Book
   hs-source-dirs:
       src
+  default-extensions:
+      StrictData
   build-depends:
       aeson
     , aeson-pretty

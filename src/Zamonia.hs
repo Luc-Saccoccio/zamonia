@@ -1,9 +1,6 @@
 {-# LANGUAGE OverloadedStrings #-}
 module Zamonia
-  ( FilmsCommand(..)
-  , SeriesCommand(..)
-  , BooksCommand(..)
-  , Film(..)
+  ( Film(..)
   , Series(..)
   , Book(..)
   , Sort(..)

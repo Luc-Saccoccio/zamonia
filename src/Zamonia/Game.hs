@@ -14,17 +14,3 @@ import           Text.Replace
 import           Zamonia.Work
 
 data Game = Game {}
-
-data GamesCommand =
-            GAdd Game
-             | GDelete Int
-             | GPrint Int
-             | GModify Int Game
-             | GSearch String String
-             | GImportCSV FilePath
-             | GImportJSON FilePath
-             | GExportJSON FilePath
-             | GExportCSV FilePath
-             | GExportFormatted FilePath FilePath
-             | GList Sort
-             | GPurge

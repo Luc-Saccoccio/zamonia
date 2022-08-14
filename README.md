@@ -101,10 +101,9 @@ $ source <(zamonia --bash-completion-script `which zamonia`)
 
 ## TODO
 
-- [~] Add a TUI
-- [ ] Simplify option parsing (too much code for that)
 - [ ] Add Search
 - [ ] Add support for video games
-- [ ] (in UI) Store series/movies/so on differently ? Or requery ? idk
+- [ ] (in UI) Store series/movies/so on differently ?
+- [ ] (in UI) insertion takes time. Too much time
 - [ ] Add comments to the code
 - [ ] Review **every** `case` in Zamonia.UI and see if Proxies can help
