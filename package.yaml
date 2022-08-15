@@ -1,5 +1,5 @@
 name: zamonia
-version:        0.2.0.1
+version:        0.2.0.2
 description:    Please see the README on GitHub at <https://github.com/Luc-Saccoccio/zamonia>
 homepage:       https://github.com/Luc-Saccoccio/zamonia
 bug-reports:    https://github.com/Luc-Saccoccio/zamonia/issues
@@ -32,6 +32,7 @@ library:
     - bytestring
     - cassava
     - text-replace
+    - typed-process
     - sqlite-simple
     - text
     - brick >= 0.64

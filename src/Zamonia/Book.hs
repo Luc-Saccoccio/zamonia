@@ -2,14 +2,10 @@
 module Zamonia.Book
     where
 
-import           Control.Monad            (mzero, (>=>))
+import           Control.Monad          (mzero)
 import           Data.Aeson
-import           Data.Aeson.Encode.Pretty (encodePretty)
-import qualified Data.ByteString.Lazy     as BS
-import qualified Data.Csv                 as C
-import qualified Data.Text as T
-import qualified Data.Text.Lazy as L
-import           Data.Vector              (Vector)
+import qualified Data.Csv               as C
+import qualified Data.Text              as T
 import           Database.SQLite.Simple
 import           Text.Printf
 import           Text.Replace
@@ -44,10 +40,10 @@ instance FromJSON Book where
 
 -- | Instance to allow transforming a Book to a JSON entry
 instance ToJSON Book where
-    toJSON (Book bid isbn title originalTitle author publisher year possession watched)
+    toJSON (Book bid isbn title' originalTitle author publisher year possession watched)
       = object [ "id" .= bid
                , "isbn" .= isbn
-               , "title" .= title
+               , "title" .= title'
                , "originalTitle" .= originalTitle
                , "author" .= author
                , "publisher" .= publisher
@@ -140,8 +136,8 @@ listBooks s conn = query_ conn sql
         sql :: Query
         sql = case s of
                 Names -> "SELECT IdB, Done, Title FROM Books ORDER BY Title" -- Sorting by name
-                Done -> "SELECT IdB, Done, Title FROM Books ORDER BY Done" -- Sorting by watching state
-                Ids -> "SELECT IdB, Done, Title FROM Books" -- Default sort => by index
+                Done  -> "SELECT IdB, Done, Title FROM Books ORDER BY Done" -- Sorting by watching state
+                Ids   -> "SELECT IdB, Done, Title FROM Books" -- Default sort => by index
 
 -- | Delete all entries in Books table
 purgeBooks :: Connection -> IO ()

@@ -207,58 +207,63 @@ usage = subparser $
     <> command "init"   (pure Init `withInfo` "Initiate a Zamonia database")
     <> command "tui"    (pure TUI `withInfo` "Open the TUI")
 
+
+-- TODO: simplify using proxies
 runFilms :: FilmsCommand -> IO ()
-runFilms (Add    f    ) = connection $ flip addWork f
 runFilms (Delete n    ) = connection $ flip delFilm n
+runFilms Purge          = connection purgeFilms
+runFilms (List s) = connection $ listFilms s >=> mapM_
+  (\(n, w, t) ->
+    putStr $ printf "\ESC[1;32m%d\ESC[m\t\ESC[1;35m%s\ESC[m\t%s\n" n w t
+  )
+
+runFilms (Add    f    ) = connection $ flip addWork f
 runFilms (Print  n    ) = connection $ \c -> fetchWork c n >>= printWork @Film
 runFilms (Modify n f  ) = connection $ \c -> modWork c n f
 runFilms (ImportJSON f) = connection $ \c -> importJSON (Proxy @Film) c f
 runFilms (ImportCSV  f) = connection $ \c -> importCSV (Proxy @Film) c f
 runFilms (ExportJSON f) = connection $ \c -> exportJSON (Proxy @Film) c f
 runFilms (ExportCSV  f) = connection $ \c -> exportCSV (Proxy @Film) c f
-runFilms Purge          = connection purgeFilms
 runFilms (ExportFormatted t f) =
   connection $ allToFullFormatted (Proxy @Film) t >=> I.writeFile f . L.toStrict
-runFilms (List s) = connection $ listFilms s >=> mapM_
-  (\(n, w, t) ->
-    putStr $ printf "\ESC[1;32m%d\ESC[m\t\ESC[1;35m%s\ESC[m\t%s\n" n w t
-  )
 runFilms _ = putStrLn "Not implemented yet"
 
 runSeries :: SeriesCommand -> IO ()
-runSeries (Add    f    ) = connection $ \c -> addWork c f
 runSeries (Delete n    ) = connection $ \c -> delSeries c n
+runSeries Purge          = connection purgeSeries
+runSeries (List s) = connection $ listSeries s >=> mapM_
+  (\(n, w, t) ->
+    putStr $ printf "\ESC[1;32m%d\ESC[m\t\ESC[1;35m%s\ESC[m\t%s\n" n w t
+  )
+
+runSeries (Add    f    ) = connection $ \c -> addWork c f
 runSeries (Print  n    ) = connection $ \c -> fetchWork c n >>= printWork @Series
 runSeries (Modify n s  ) = connection $ \c -> modWork c n s
 runSeries (ImportJSON f) = connection $ \c -> importJSON (Proxy @Series) c f
 runSeries (ImportCSV  f) = connection $ \c -> importCSV (Proxy @Series) c f
 runSeries (ExportJSON f) = connection $ \c -> exportJSON (Proxy @Series) c f
 runSeries (ExportCSV  f) = connection $ \c -> exportCSV (Proxy @Series) c f
-runSeries Purge          = connection purgeSeries
 runSeries (ExportFormatted t f) =
     connection $ allToFullFormatted (Proxy @Series) t >=> I.writeFile f . L.toStrict
-runSeries (List s) = connection $ listSeries s >=> mapM_
-  (\(n, w, t) ->
-    putStr $ printf "\ESC[1;32m%d\ESC[m\t\ESC[1;35m%s\ESC[m\t%s\n" n w t
-  )
 runSeries _ = putStrLn "Not implemented yet"
 
 runBooks :: BooksCommand -> IO ()
-runBooks (Add    f    ) = connection $ \c -> addWork c f
 runBooks (Delete n    ) = connection $ \c -> delBook c n
+runBooks Purge          = connection purgeBooks
+runBooks (List s) = connection $ listBooks s >=> mapM_
+  (\(n, w, t) ->
+    putStr $ printf "\ESC[1;32m%d\ESC[m\t\ESC[1;35m%s\ESC[m\t%s\n" n w t
+  )
+
+runBooks (Add    f    ) = connection $ \c -> addWork c f
 runBooks (Print  n    ) = connection $ \c -> fetchWork c n >>= printWork @Book
 runBooks (Modify n s  ) = connection $ \c -> modWork c n s
 runBooks (ImportJSON f) = connection $ \c -> importJSON (Proxy @Book) c f
 runBooks (ImportCSV  f) = connection $ \c -> importCSV (Proxy @Book) c f
 runBooks (ExportJSON f) = connection $ \c -> exportJSON (Proxy @Book) c f
 runBooks (ExportCSV  f) = connection $ \c -> exportCSV (Proxy @Book) c f
-runBooks Purge          = connection purgeBooks
 runBooks (ExportFormatted t f) =
   connection $ allToFullFormatted (Proxy @Book) t >=> I.writeFile f . L.toStrict
-runBooks (List s) = connection $ listBooks s >=> mapM_
-  (\(n, w, t) ->
-    putStr $ printf "\ESC[1;32m%d\ESC[m\t\ESC[1;35m%s\ESC[m\t%s\n" n w t
-  )
 runBooks _ = putStrLn "Not implemented yet"
 
 main :: IO ()

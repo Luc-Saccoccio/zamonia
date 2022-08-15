@@ -22,6 +22,7 @@ The tool has 3 main commands, and multiple subcommands:
 - `film`: Command leading to subcommands related to films.
 - `series`: Command leading to subcommands related to series.
 - `book`: Command leading to subcommands related to books.
+- `tui`: Open the TUI
 
 ### Subcommands
 
@@ -36,7 +37,6 @@ There is 11 subcommands:
 - `export-csv`/`export-json`: Import a database to a headerless (to discuss) CSV/JSON file.
 - `export-formatted`: Export a table to a document. The template can be in any markup language. See the section.
 - `list`: List all the works by index and title.
-- `search`: Not implemented yet.
 
 ### Formatted output
 
@@ -66,7 +66,7 @@ Here are the keywords for films:
 - `%possession%`: Possession state
 - `%watched%`: Watching state
 
-#### Films
+#### Series
 
 Here are the keywords for series:
 - `%index%`: Index of the series
@@ -98,6 +98,11 @@ You can activate completions by executing
 ```
 $ source <(zamonia --bash-completion-script `which zamonia`)
 ```
+
+## Remarks
+
+- **The ID is supposed to be UNIQUE**, don't act surprised if you use the same ID and end up with problems...
+- **This tool is not optimal**, it was made so I could use it. Contributions are, of course, welcome.
 
 ## TODO
 

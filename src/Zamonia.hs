@@ -9,6 +9,7 @@ module Zamonia
   , booksLocation
   , seriesLocation
   , filmsLocation
+  , editor
   , connection
   , listFilms
   , listSeries

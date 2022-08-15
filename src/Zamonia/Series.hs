@@ -2,14 +2,10 @@
 
 module Zamonia.Series where
 
-import           Control.Monad            (mzero, (>=>))
-import           Data.Aeson               hiding (Series)
-import           Data.Aeson.Encode.Pretty (encodePretty)
-import qualified Data.ByteString.Lazy     as BS
-import qualified Data.Csv                 as C
-import qualified Data.Text as T
-import qualified Data.Text.Lazy as L
-import           Data.Vector              (Vector)
+import           Control.Monad          (mzero)
+import           Data.Aeson             hiding (Series)
+import qualified Data.Csv               as C
+import qualified Data.Text              as T
 import           Database.SQLite.Simple
 import           Text.Printf
 import           Text.Replace
@@ -44,9 +40,9 @@ instance FromJSON Series where
 
 -- | Instance to allow transforming a Series to a JSON entry
 instance ToJSON Series where
-    toJSON (Series i title originalTitle director year epNumber seNumber possession watched)
+    toJSON (Series i title' originalTitle director year epNumber seNumber possession watched)
       = object ["id" .= i,
-                "title" .= title,
+                "title" .= title',
                 "originalTitle" .= originalTitle,
                 "director" .= director,
                 "year" .= year,

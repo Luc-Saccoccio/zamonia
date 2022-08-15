@@ -2,15 +2,11 @@
 module Zamonia.Film
     where
 
-import           Control.Monad            (mzero, (>=>))
+import           Control.Monad          (mzero)
 import           Data.Aeson
-import           Data.Aeson.Encode.Pretty (encodePretty)
-import qualified Data.ByteString.Lazy     as BS
-import qualified Data.Csv                 as C hiding ((.!))
-import qualified Data.Text as T
-import qualified Data.Text.Lazy as L
-import           Data.Csv ((.!))
-import           Data.Vector              (Vector)
+import           Data.Csv               ((.!))
+import qualified Data.Csv               as C hiding ((.!))
+import qualified Data.Text              as T
 import           Database.SQLite.Simple
 import           Text.Printf
 import           Text.Replace
@@ -41,9 +37,9 @@ instance FromJSON Film where
 
 -- | Instance to allow transforming a Film to a JSON entry
 instance ToJSON Film where
-    toJSON (Film i title originalTitle director year possession watched)
+    toJSON (Film i title' originalTitle director year possession watched)
       = object ["id" .= i,
-                "title" .= title,
+                "title" .= title',
                 "originalTitle" .= originalTitle,
                 "director" .= director,
                 "year" .= year,
@@ -127,8 +123,8 @@ listFilms s conn = query_ conn sql
         sql :: Query
         sql = case s of
                 Names -> "SELECT IdF, Done, Title FROM Films ORDER BY Title" -- Sorting by name
-                Done -> "SELECT IdF, Done, Title FROM Films ORDER BY Done" -- Sorting by watching state
-                Ids -> "SELECT IdF, Done, Title FROM Films" -- Default sort => by index
+                Done  -> "SELECT IdF, Done, Title FROM Films ORDER BY Done" -- Sorting by watching state
+                Ids   -> "SELECT IdF, Done, Title FROM Films" -- Default sort => by index
 
 -- | Delete all entries in Films table
 purgeFilms :: Connection -> IO ()

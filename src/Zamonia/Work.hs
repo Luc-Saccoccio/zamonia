@@ -1,6 +1,6 @@
 {-# LANGUAGE OverloadedStrings   #-}
-{-# LANGUAGE TypeApplications    #-}
 {-# LANGUAGE ScopedTypeVariables #-}
+{-# LANGUAGE TypeApplications    #-}
 module Zamonia.Work
     where
 
@@ -10,7 +10,6 @@ import           Data.Aeson.Encode.Pretty (encodePretty)
 import qualified Data.ByteString.Lazy     as BS (readFile, writeFile)
 import           Data.Csv                 (FromRecord, HasHeader (..), ToRecord,
                                            decode, encode)
-import           Data.Proxy
 import qualified Data.Text                as T (Text, null)
 import qualified Data.Text.Lazy           as L (Text, concat, pack)
 import           Data.Vector              (Vector)

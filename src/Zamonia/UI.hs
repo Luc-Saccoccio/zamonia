@@ -15,14 +15,13 @@ import           Brick.Forms            (Form, editShowableField, editTextField,
                                          formFocus, formState, handleFormEvent,
                                          newForm, renderForm, (@@=))
 import qualified Brick.Forms            as Forms
-import qualified Brick.Types
 import qualified Brick.Widgets.Border   as B
 import qualified Brick.Widgets.Center   as C
 import qualified Brick.Widgets.Dialog   as D
 import qualified Brick.Widgets.Edit     as E
 import qualified Brick.Widgets.List     as L
 import           Control.Arrow          ((&&&))
-import           Control.Monad          (join, void, (<=<))
+import           Control.Monad          (join, liftM2, void, (<=<))
 import           Control.Monad.IO.Class (liftIO)
 import           Data.Maybe             (fromJust)
 import           Data.Proxy
@@ -30,9 +29,10 @@ import qualified Data.Text              as T
 import qualified Data.Vector            as Vec
 import           Database.SQLite.Simple
 import qualified Graphics.Vty           as V
-import           Lens.Micro             (ASetter, _3, (%~), (&), (.~), (?~),
-                                         (^.))
+import           Lens.Micro             (ASetter, Getting, _3, (%~), (&), (.~),
+                                         (?~), (^.))
 import           Lens.Micro.TH
+import           System.Process.Typed   (ProcessConfig, proc, runProcess)
 import           Zamonia
 import           Zamonia.Work           (Work, listRepresentation, new)
 
@@ -68,6 +68,9 @@ data ResourceName = Id -- ^ ID or ISBN
             | InfoDialog (String, ResourceName)
             | Help
     deriving (Eq, Ord, Show)
+
+fst' :: (a, b, c) -> a
+fst' (a, _, _) = a
 
 formResources :: [ResourceName]
 formResources = [Id, Author, EpNumber, OriginalTitle, Possession, Publisher, SeNumber, Status, Title, Year]
@@ -183,7 +186,8 @@ infoWidget =
       str "a: add   "
   <=> str "e: edit  "
   <=> str "x: remove"
-  <=> str "s: sort"
+  <=> str "s: sort  "
+  <=> str "n: note  "
   <+> fill ' '
 
 drawList :: WorkList -> Widget ResourceName
@@ -235,8 +239,6 @@ indexInsertList e@(_, _, n) l = go 0 end
 showInformation :: forall e. ResourceName -> AppState e -> EventM ResourceName (Next (AppState e))
 showInformation focus state = maybe (continueWithoutRedraw state) h entry
   where
-    fst' :: (a, b, c) -> a
-    fst' (a, _, _) = a
     entry :: Maybe (ListItem, EventM ResourceName String)
     entry =
       case focus of
@@ -256,7 +258,7 @@ showInformation focus state = maybe (continueWithoutRedraw state) h entry
       let !prevFocus = state^.focusRing
        in (\s' -> continue (state & previousFocusRing ?~ prevFocus
                                   & infoDialog ?~ informationDialog i t
-                                  & focusRing .~ (F.focusRing . (:[]) . InfoDialog . (,focus) $ s')
+                                  & focusRing .~ (F.focusRing . (:[]) . InfoDialog $ (s',focus))
                      )) =<< s
 
 informationDialog :: Int -> T.Text -> D.Dialog ()
@@ -289,11 +291,11 @@ renderRemoveDialog _ _ = str ""
 
 removeEntry :: ResourceName -> AppState e -> EventM ResourceName (Next (AppState e))
 removeEntry focus state =
-  let entry = case focus of
-                SeriesTable -> L.listSelectedElement (state^.seriesTable)
-                FilmsTable  -> L.listSelectedElement (state^.filmTable)
-                BooksTable  -> L.listSelectedElement (state^.bookTable)
-                _           -> error "removeEntry: focus is not right"
+  let entry = L.listSelectedElement $ state ^. (case focus of
+                SeriesTable -> seriesTable
+                FilmsTable  -> filmTable
+                BooksTable  -> bookTable
+                _           -> error "removeEntry: focus is not right")
    in maybe (continueWithoutRedraw state) f entry
   where
     f (n, x) =
@@ -302,6 +304,24 @@ removeEntry focus state =
                       & previousFocusRing ?~ prevRing
                       & focusRing .~ F.focusRing [RemoveDialog (x, focus)]
                )
+
+editNote :: forall e. ResourceName -> AppState e -> EventM ResourceName (Next (AppState e))
+editNote focus state =
+  case num of
+    Nothing -> continueWithoutRedraw state
+    Just n -> liftIO (command n) >>= runProcess >> continue state
+  where
+    f :: Getting WorkList (AppState e) WorkList -> Maybe Int
+    f = ((fst' . snd) <$>) . L.listSelectedElement . (state^.)
+    location :: IO FilePath
+    num :: Maybe Int
+    (!location, !num) = case focus of
+                        SeriesTable -> (seriesLocation, f seriesTable)
+                        FilmsTable -> (filmsLocation, f filmTable)
+                        BooksTable -> (booksLocation, f bookTable)
+                        _ -> error "editNot: focus is not right"
+    command :: Int ->  IO (ProcessConfig () () ())
+    command n = liftM2 (\e l -> proc e [l ++ (show n ++ ".md")]) editor location -- FIXME: not nice
 
 appendForm :: ResourceName -> AppState e -> EventM ResourceName (Next (AppState e))
 appendForm focus state =
@@ -329,7 +349,7 @@ appendForm focus state =
       inc :: Maybe Int -> Int
       inc = maybe 1 (+1)
 
-editForm :: ResourceName -> AppState e -> EventM ResourceName (Next (AppState e))
+editForm :: ResourceName -> AppState e -> EventM ResourceName (Next (AppState e)) -- TODO: FIXME
 editForm focus state =
   let getter =
         case focus of
@@ -404,6 +424,7 @@ handleEvent state event =
       VtyEvent (V.EvKey (V.KChar 'a') []) -> appendForm (fromJust focus) state
       VtyEvent (V.EvKey (V.KChar 'e') []) -> editForm (fromJust focus) state
       VtyEvent (V.EvKey (V.KChar 'x') []) -> removeEntry (fromJust focus) state
+      VtyEvent (V.EvKey (V.KChar 'n') []) -> editNote (fromJust focus) state
       VtyEvent (V.EvKey V.KEnter [])      -> showInformation (fromJust focus) state
       VtyEvent ev ->
         let handledEvent = L.handleListEventVi L.handleListEvent ev
@@ -422,9 +443,9 @@ handleEvent state event =
         where
           !prevFocus = fromJust (state^.previousFocusRing)
           !dialogResult = join $ state^.removingDialog >>= D.dialogSelection
-          state' = (state & focusRing .~ prevFocus
-                          & previousFocusRing .~ Nothing
-                          & removingDialog .~ Nothing)
+          state' = state & focusRing .~ prevFocus
+                         & previousFocusRing .~ Nothing
+                         & removingDialog .~ Nothing
           f :: Int -> EventM ResourceName (Next (AppState e))
           f n =
             case orig of
@@ -444,14 +465,14 @@ handleEvent state event =
                             & previousFocusRing .~ Nothing
                             & infoDialog .~ Nothing)
       (Just (RemoveDialog _), VtyEvent ev) ->
-        case (state^.removingDialog) of
+        case state^.removingDialog of
           Nothing -> continue state
           Just dialog ->
             do
               newDialog <- D.handleDialogEvent ev dialog
               continue (state & removingDialog ?~ newDialog)
       (Just (InfoDialog _), VtyEvent ev) ->
-        case (state^.infoDialog) of
+        case state^.infoDialog of
           Nothing -> continue state
           Just dialog ->
             do newDialog <- D.handleDialogEvent ev dialog
@@ -462,9 +483,7 @@ handleEvent state event =
                     & form.~ Nothing
                     & previousFocusRing .~ Nothing
                     & focusRing .~ prevRing)
-      (Just f, VtyEvent (V.EvKey V.KEnter [])) ->
-        if f `elem` formResources then closeForm state
-                  else continue state
+      (Just _, VtyEvent (V.EvKey V.KEnter [])) -> closeForm state
       _ -> do
         w' <- f . fromJust $ state^.form
         continue (state & form ?~ w')
@@ -477,34 +496,33 @@ handleEvent state event =
             f (B x) = B <$> g x
 
 drawUI :: AppState e -> [Widget ResourceName]
-drawUI state = case currentFocus of
-                 Just SeriesTable -> [drawList (state^.seriesTable)]
-                 Just FilmsTable -> [drawList (state^.filmTable)]
-                 Just BooksTable -> [drawList (state^.bookTable)]
-                 Just (RemoveDialog (x, table)) ->
-                   (renderRemoveDialog x (state^.removingDialog)):background table
-                 Just (InfoDialog (w, table)) ->
-                   (renderInfoDialog w (state^.infoDialog)):background table
-                 _ ->
-                     case currentForm of
-                       Just (S sf) -> drawForm sf:background SeriesTable
-                       Just (F ff) -> drawForm ff:background FilmsTable
-                       Just (B bf) -> drawForm bf:background BooksTable
-                       _           -> error "drawUI: currentForm is empty"
+drawUI state =
+  case currentForm of
+    Nothing     -> background currentFocus
+    Just (S sf) -> drawForm sf:background SeriesTable
+    Just (F ff) -> drawForm ff:background FilmsTable
+    Just (B bf) -> drawForm bf:background BooksTable
     where
-        currentFocus = F.focusGetCurrent (state^.focusRing)
-        currentForm = state^.form
-        background = \case SeriesTable -> [drawList (state^.seriesTable)]
-                           FilmsTable  -> [drawList (state^.filmTable)]
-                           BooksTable  -> [drawList (state^.bookTable)]
-                           _           -> error "drawUI: focus is not right"
+      currentFocus = fromJust $ F.focusGetCurrent (state^.focusRing)
+      currentForm = state^.form
+      background :: ResourceName -> [Widget ResourceName]
+      background =
+        \case SeriesTable -> [drawList (state^.seriesTable)]
+              FilmsTable -> [drawList (state^.filmTable)]
+              BooksTable -> [drawList (state^.bookTable)]
+              (RemoveDialog (x, table)) ->
+                renderRemoveDialog x (state^.removingDialog):background table
+              (InfoDialog (w, table)) ->
+                renderInfoDialog w (state^.infoDialog):background table
+              _           -> error "drawUI: focus is not right"
 
 appCursor :: AppState e -> [CursorLocation ResourceName] -> Maybe (CursorLocation ResourceName)
 appCursor state =
+  let g = F.focusRingCursor formFocus in
   case state^.form of
-    Just (S s) -> F.focusRingCursor formFocus s -- TODO: Simplify ?
-    Just (F f) -> F.focusRingCursor formFocus f
-    Just (B b) -> F.focusRingCursor formFocus b
+    Just (S s) -> g s
+    Just (F f) -> g f
+    Just (B b) -> g b
     _          -> F.focusRingCursor (^.focusRing) state
 
 initState :: Connection -> IO (AppState e)
