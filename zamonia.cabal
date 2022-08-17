@@ -55,7 +55,7 @@ executable zamonia
       Paths_zamonia
   hs-source-dirs:
       app
-  ghc-options: -Wall -threaded -O2 -rtsopts -with-rtsopts=-N
+  ghc-options: -Wall -Wcompat -Widentities -Wincomplete-record-updates -Wincomplete-uni-patterns -Wpartial-fields -Wredundant-constraints -threaded -O2 -rtsopts -with-rtsopts=-N
   build-depends:
       base >=4.7 && <5
     , cassava

@@ -44,7 +44,7 @@ library:
 executable:
   source-dirs: app
   main: Main.hs
-  ghc-options: -Wall -threaded -O2 -rtsopts -with-rtsopts=-N
+  ghc-options: -Wall -Wcompat -Widentities -Wincomplete-record-updates -Wincomplete-uni-patterns -Wpartial-fields -Wredundant-constraints -threaded -O2 -rtsopts -with-rtsopts=-N
   dependencies:
     - base >=4.7 && <5
     - optparse-applicative
