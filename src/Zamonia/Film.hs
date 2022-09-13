@@ -98,12 +98,6 @@ instance Work Film where
             , _fwatched = compareFields w1 w2
             }
     queryAll conn = query_ conn "SELECT * FROM Films"
-    fetchWork conn n = queryNamed conn sql [":id" := n]
-      where
-        sql :: Query
-        sql = "SELECT * FROM Films WHERE IdF = :id"
-    modWork conn n f = (addWork conn . cmpWork f . head) =<<
-        (queryNamed conn "SELECT * FROM Films WHERE IdF = :id" [":id" := n] :: IO [Film])
     replaceList (Film i t o d y p w) = [ Replace "%index%" (T.pack $ show i)
                                        , Replace "%title%" t
                                        , Replace "%originalTitle%" o
@@ -111,10 +105,6 @@ instance Work Film where
                                        , Replace "%year%" y
                                        , Replace "%possession%" p
                                        , Replace "%watched%" w]
-
--- | Delete the film matching the index
-delFilm :: Connection -> Int -> IO ()
-delFilm conn n = execute conn "DELETE FROM Films WHERE IdF = ?" (Only n)
 
 -- | Return a list of all films, sorted the way asked
 listFilms :: Sort -> Connection -> IO [(Int, T.Text, T.Text)]

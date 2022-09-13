@@ -1,5 +1,6 @@
-{-# LANGUAGE OverloadedStrings #-}
-{-# LANGUAGE TypeApplications  #-}
+{-# LANGUAGE OverloadedStrings   #-}
+{-# LANGUAGE ScopedTypeVariables #-}
+{-# LANGUAGE TypeApplications    #-}
 module Main where
 
 import           Control.Monad          ((>=>))
@@ -10,15 +11,14 @@ import qualified Data.Text.Lazy         as L
 import           Database.SQLite.Simple
 import           Options.Applicative
 import           System.Directory       (createDirectoryIfMissing)
-import           Text.Printf
 import           Zamonia
 import qualified Zamonia.UI             (main)
 
 data Command w =
             Add w
-             | Delete Int
-             | Print Int
-             | Modify Int w
+             | Delete Id
+             | Print Id
+             | Modify Id w
              | Search String String
              | ImportCSV FilePath
              | ImportJSON FilePath
@@ -140,8 +140,8 @@ importFileJSON = strArgument (metavar "FILE" <> help "File to Import, must be a 
 export :: Parser String
 export = strArgument (metavar "FILE" <> help "Destination of the export")
 
-subCommandsBase :: Mod CommandFields (Command w)
-subCommandsBase =
+subCommandsBase :: (Int -> Id) -> Mod CommandFields (Command w)
+subCommandsBase cons =
      command "delete" (info (helper <*> del) (progDesc "Delete first matching book from database"))
   <> command "show"   (info (helper <*> shw) (progDesc "Show informations about specified index"))
   <> command "import-csv" (info (helper <*> imc) (progDesc "Import entries from CSV"))
@@ -153,8 +153,8 @@ subCommandsBase =
   <> command "purge"  (info (pure Purge) (progDesc "Purge all rows from table in database"))
   <> command "search" (info (helper <*> search) (progDesc "Search keyword in database"))
     where
-      del       = Delete <$> argument auto (metavar "INDEX" <> help "Index to delete, must be an integer")
-      shw       = Print  <$> argument auto (metavar "INDEX" <> help "Index to show, must be an integer")
+      del       = Delete . cons <$> argument auto (metavar "INDEX" <> help "Index to delete, must be an integer")
+      shw       = Print . cons <$> argument auto (metavar "INDEX" <> help "Index to show, must be an integer")
       imc       = ImportCSV <$> importFileCSV
       imj       = ImportJSON <$> importFileJSON
       exc       = ExportCSV <$> export
@@ -165,37 +165,37 @@ subCommandsBase =
 
 subCommandsFilms :: Parser FilmsCommand
 subCommandsFilms = subparser $
-              subCommandsBase
+              subCommandsBase IdF
            <> command "add"    (info (helper <*> add) (progDesc "Add film to the database"))
            <> command "modify" (info (helper <*> mdf) (progDesc "Modify first matching film from database"))
                where
                    add       = Add    <$> (Film <$> index <*> strArgument (metavar "TITLE" <> help "Title of the film you want to add")
                                                    <*> original <*> director <*> year <*> possession <*> watched)
-                   mdf       = Modify <$> index
+                   mdf       = Modify <$> (IdF <$> index)
                                            <*> (Film <$> argument auto (metavar "INDEX" <> value (-1))
                                            <*> tTitle <*> original <*> director <*> year <*> possession <*> watched)
 
 subCommandsSeries :: Parser SeriesCommand
 subCommandsSeries = subparser $
-              subCommandsBase
+              subCommandsBase IdS
            <> command "add"    (info (helper <*> add) (progDesc "Add a series to the database"))
            <> command "modify" (info (helper <*> mdf) (progDesc "Modify first matching film from database"))
                where
                    add       = Add    <$> (Series <$> index <*> strArgument (metavar "TITLE" <> help "Title of the series you want to add")
                                                    <*> original <*> director <*> year <*> episodesNumber <*> seasonsNumber <*> possession <*> watched)
-                   mdf       = Modify <$> index
+                   mdf       = Modify <$> (IdS <$> index)
                                        <*> (Series <$> argument auto (metavar "INDEX" <> value (-1)) <*> tTitle <*> original <*> director <*> year
                                                        <*> episodesNumber <*> seasonsNumber <*> possession <*> watched)
 
 subCommandsBooks :: Parser BooksCommand
 subCommandsBooks = subparser $
-              subCommandsBase
+              subCommandsBase IdB
            <> command "modify" (info (helper <*> mdf) (progDesc "Modify first matching book from database"))
            <> command "add"    (info (helper <*> add) (progDesc "Add a book to the database"))
                where
                    add       = Add    <$> (Book <$> index <*> isbn <*> strArgument (metavar "TITLE" <> help "Title of the book you want to add")
                                                    <*> original <*> author <*> publisher <*> year <*> possession <*> watched)
-                   mdf       = Modify <$> index
+                   mdf       = Modify <$> (IdB <$> index)
                                        <*> (Book <$> index <*> isbn <*> tTitle <*> original <*> author <*> publisher
                                                        <*> year <*> possession <*> watched)
 
@@ -208,63 +208,41 @@ usage = subparser $
     <> command "tui"    (pure TUI `withInfo` "Open the TUI")
 
 
--- TODO: simplify using proxies
+run :: Cons work => proxy work -> Command work -> IO ()
+run _ (Delete n) = connection $ flip delWork n
+run _ (Add f) = connection $ flip addWork f
+run _ (Modify n s) = connection $ \c -> modWork c n s
+run (_ :: proxy work) (Print n) = connection $ \c -> fetchWork c n >>= printWork @work
+run (_ :: proxy work) (ImportJSON f) = connection $ \c -> importJSON (Proxy @work) c f
+run (_ :: proxy work) (ImportCSV  f) = connection $ \c -> importCSV (Proxy @work) c f
+run (_ :: proxy work) (ExportJSON f) = connection $ \c -> exportJSON (Proxy @work) c f
+run (_ :: proxy work) (ExportCSV  f) = connection $ \c -> exportCSV (Proxy @work) c f
+run (_ :: proxy work) (ExportFormatted t f) =
+  connection $ allToFullFormatted (Proxy @work) t >=> I.writeFile f . L.toStrict
+run _ _ = putStrLn "Not implemented yet"
+
+
+{- TODO
 runFilms :: FilmsCommand -> IO ()
-runFilms (Delete n    ) = connection $ flip delFilm n
-runFilms Purge          = connection purgeFilms
 runFilms (List s) = connection $ listFilms s >=> mapM_
   (\(n, w, t) ->
     putStr $ printf "\ESC[1;32m%d\ESC[m\t\ESC[1;35m%s\ESC[m\t%s\n" n w t
   )
-
-runFilms (Add    f    ) = connection $ flip addWork f
-runFilms (Print  n    ) = connection $ \c -> fetchWork c n >>= printWork @Film
-runFilms (Modify n f  ) = connection $ \c -> modWork c n f
-runFilms (ImportJSON f) = connection $ \c -> importJSON (Proxy @Film) c f
-runFilms (ImportCSV  f) = connection $ \c -> importCSV (Proxy @Film) c f
-runFilms (ExportJSON f) = connection $ \c -> exportJSON (Proxy @Film) c f
-runFilms (ExportCSV  f) = connection $ \c -> exportCSV (Proxy @Film) c f
-runFilms (ExportFormatted t f) =
-  connection $ allToFullFormatted (Proxy @Film) t >=> I.writeFile f . L.toStrict
-runFilms _ = putStrLn "Not implemented yet"
-
 runSeries :: SeriesCommand -> IO ()
-runSeries (Delete n    ) = connection $ \c -> delSeries c n
-runSeries Purge          = connection purgeSeries
 runSeries (List s) = connection $ listSeries s >=> mapM_
   (\(n, w, t) ->
     putStr $ printf "\ESC[1;32m%d\ESC[m\t\ESC[1;35m%s\ESC[m\t%s\n" n w t
   )
-
-runSeries (Add    f    ) = connection $ \c -> addWork c f
-runSeries (Print  n    ) = connection $ \c -> fetchWork c n >>= printWork @Series
-runSeries (Modify n s  ) = connection $ \c -> modWork c n s
-runSeries (ImportJSON f) = connection $ \c -> importJSON (Proxy @Series) c f
-runSeries (ImportCSV  f) = connection $ \c -> importCSV (Proxy @Series) c f
-runSeries (ExportJSON f) = connection $ \c -> exportJSON (Proxy @Series) c f
-runSeries (ExportCSV  f) = connection $ \c -> exportCSV (Proxy @Series) c f
-runSeries (ExportFormatted t f) =
-    connection $ allToFullFormatted (Proxy @Series) t >=> I.writeFile f . L.toStrict
-runSeries _ = putStrLn "Not implemented yet"
-
 runBooks :: BooksCommand -> IO ()
-runBooks (Delete n    ) = connection $ \c -> delBook c n
-runBooks Purge          = connection purgeBooks
 runBooks (List s) = connection $ listBooks s >=> mapM_
   (\(n, w, t) ->
     putStr $ printf "\ESC[1;32m%d\ESC[m\t\ESC[1;35m%s\ESC[m\t%s\n" n w t
   )
 
-runBooks (Add    f    ) = connection $ \c -> addWork c f
-runBooks (Print  n    ) = connection $ \c -> fetchWork c n >>= printWork @Book
-runBooks (Modify n s  ) = connection $ \c -> modWork c n s
-runBooks (ImportJSON f) = connection $ \c -> importJSON (Proxy @Book) c f
-runBooks (ImportCSV  f) = connection $ \c -> importCSV (Proxy @Book) c f
-runBooks (ExportJSON f) = connection $ \c -> exportJSON (Proxy @Book) c f
-runBooks (ExportCSV  f) = connection $ \c -> exportCSV (Proxy @Book) c f
-runBooks (ExportFormatted t f) =
-  connection $ allToFullFormatted (Proxy @Book) t >=> I.writeFile f . L.toStrict
-runBooks _ = putStrLn "Not implemented yet"
+runFilms Purge          = connection purgeFilms
+runSeries Purge          = connection purgeSeries
+runBooks Purge          = connection purgeBooks
+-}
 
 main :: IO ()
 main = do
@@ -273,9 +251,9 @@ main = do
             <> progDesc "CLI personal library database"
             <> header "zamonia - a CLI personal library database written in haskell" ))
     case execution of
-      Films c -> runFilms c
-      Series' c -> runSeries c
-      Books c -> runBooks c
+      Films c -> run (Proxy @Film) c
+      Series' c -> run (Proxy @Series) c
+      Books c -> run (Proxy @Book) c
       TUI -> Zamonia.UI.main
       Init ->
           localLocation >>= createDirectoryIfMissing True

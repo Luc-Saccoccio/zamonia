@@ -243,15 +243,15 @@ showInformation focus state = maybe (continueWithoutRedraw state) h entry
     entry =
       case focus of
         SeriesTable ->
-          f (Proxy @Series) <$> L.listSelectedElement (state^.seriesTable)
+          f (Proxy @Series) IdS <$> L.listSelectedElement (state^.seriesTable)
         FilmsTable  ->
-          f (Proxy @Film) <$> L.listSelectedElement (state^.filmTable)
+          f (Proxy @Film) IdF <$> L.listSelectedElement (state^.filmTable)
         BooksTable  ->
-          f (Proxy @Book) <$> L.listSelectedElement (state^.bookTable)
+          f (Proxy @Book) IdB <$> L.listSelectedElement (state^.bookTable)
         _           -> error "showInformation: focus is not right"
-    f :: (Show w, Work w) => proxy w -> (Int, ListItem) -> (ListItem, EventM ResourceName String)
-    f p = (id &&& g p . fst') . snd
-    g :: (Show w, Work w) => proxy w -> Int -> EventM ResourceName String
+    f :: (FromRow w, Show w, Work w) => proxy w -> (Int -> Id) -> (Int, ListItem) -> (ListItem, EventM ResourceName String)
+    f p cons = (id &&& g p . cons . fst') . snd
+    g :: (FromRow w, Show w, Work w) => proxy w -> Id -> EventM ResourceName String
     g (_ :: proxy w) = liftIO . (show . (head @w) <$>) . fetchWork (state^.conn)
     h :: (ListItem, EventM ResourceName String) -> EventM ResourceName (Next (AppState e))
     h ((i, _, t), s) =
@@ -364,19 +364,19 @@ editForm focus state =
       -- Assumes the entry exists
       case focus of -- TODO shorter version ?
         SeriesTable ->
-          liftIO (seriesForm . head <$> fetchWork (state^.conn) n)
+          liftIO (seriesForm . head <$> fetchWork (state^.conn) (IdS n))
           >>= \item -> continue $ state
             & previousFocusRing ?~ (state^.focusRing)
             & focusRing .~ formFocus item
             & form ?~ S item
         FilmsTable ->
-          liftIO (filmForm . head <$> fetchWork (state^.conn) n)
+          liftIO (filmForm . head <$> fetchWork (state^.conn) (IdF n))
           >>= \item -> continue $ state
             & previousFocusRing ?~ (state^.focusRing)
             & focusRing .~ formFocus item
             & form ?~ F item
         BooksTable ->
-          liftIO (bookForm . head <$> fetchWork (state^.conn) n)
+          liftIO (bookForm . head <$> fetchWork (state^.conn) (IdB n))
           >>= \item -> continue $ state
             & previousFocusRing ?~ (state^.focusRing)
             & focusRing .~ formFocus item
@@ -384,6 +384,7 @@ editForm focus state =
         _ -> error "editForm: focus is not right"
 
 
+-- TODO: Test requery of the whole list instead of inserting
 closeForm :: forall e. AppState e -> EventM ResourceName (Next (AppState e))
 closeForm state =
   case currentForm of
@@ -448,15 +449,15 @@ handleEvent state event =
                          & removingDialog .~ Nothing
           f :: Int -> EventM ResourceName (Next (AppState e))
           f n =
-            case orig of
+            case orig of -- TODO: FIXME
               SeriesTable ->
-                liftIO (delSeries (state^.conn) i)
+                liftIO (delWork (state^.conn) (IdS i))
                 >> continue (state' & seriesTable %~ L.listRemove n)
               FilmsTable  ->
-                liftIO (delFilm (state^.conn) i)
+                liftIO (delWork (state^.conn) (IdF i))
                 >> continue (state' & filmTable %~ L.listRemove n)
               BooksTable  ->
-                liftIO (delBook (state^.conn) i)
+                liftIO (delWork (state^.conn) (IdB i))
                 >> continue (state' & bookTable %~ L.listRemove n)
               _ -> error "handleEvent: (in dialog) focus is not right"
       (Just (InfoDialog _), VtyEvent (V.EvKey V.KEnter [])) ->

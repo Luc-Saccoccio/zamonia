@@ -1,3 +1,4 @@
+{-# LANGUAGE ConstraintKinds     #-}
 {-# LANGUAGE OverloadedStrings   #-}
 {-# LANGUAGE ScopedTypeVariables #-}
 {-# LANGUAGE TypeApplications    #-}
@@ -13,9 +14,13 @@ import           Data.Csv                 (FromRecord, HasHeader (..), ToRecord,
 import qualified Data.Text                as T (Text, null)
 import qualified Data.Text.Lazy           as L (Text, concat, pack)
 import           Data.Vector              (Vector)
-import           Database.SQLite.Simple   (Connection)
+import           Database.SQLite.Simple   (Connection, Query, FromRow, execute, query)
+import           Text.Printf
 import           Text.Replace             (Replace, replaceWithList)
 
+data Id =  IdF Int | IdS Int | IdB Int
+
+type Cons work = (Work work, FromJSON work, ToJSON work, FromRecord work, ToRecord work, Show work, FromRow work)
 
 class Work a where
     new :: a
@@ -24,11 +29,9 @@ class Work a where
     id_ :: a -> Int -- ^ ID of the work
     listRepresentation :: a -> (Int, T.Text, T.Text)
     listRepresentation w = (id_ w, status w, title w)
-    modWork :: Connection -> Int -> a -> IO () -- ^ Modifying the informations of a work
     addWork :: Connection -> a -> IO () -- ^ Adding a work
     cmpWork :: a -> a -> a -- ^ Comparing two works
     queryAll :: Connection -> IO [a]
-    fetchWork :: Connection -> Int -> IO [a]
     replaceList :: a -> [Replace] -- ^ List containing replacing information for a specific work
     entryToFormatted :: L.Text -> a -> L.Text -- ^ Convert an entry to a formatted string
     entryToFormatted c w = replaceWithList (replaceList w) c
@@ -60,6 +63,42 @@ allToFullFormatted (_ :: proxy work) file conn = fmap L.concat . mapM toFormatte
         toFormatted = toFullFormatted @work template
         template :: IO L.Text
         template = L.pack <$> readFile file
+
+delWork :: Connection -> Id -> IO ()
+delWork conn n = execute conn sql infos
+  where
+    infos :: (T.Text, T.Text, Int)
+    infos =
+      case n of
+        (IdF x) -> ("Films", "IdF", x)
+        (IdS x) -> ("Series", "IdS", x)
+        (IdB x) -> ("Books", "IdB", x)
+    sql :: Query
+    sql = "DELETE FROM ? WHERE ? = ?"
+
+fetchWork :: (FromRow w, Work w) => Connection -> Id -> IO [w]
+fetchWork conn n = query conn sql infos
+  where
+    infos :: (T.Text, T.Text, Int)
+    infos =
+      case n of
+        (IdF x) -> ("Films", "IdF", x)
+        (IdS x) -> ("Series", "IdS", x)
+        (IdB x) -> ("Books", "IdB", x)
+    sql :: Query
+    sql = "SELECT * FROM ? WHERE ? = ?"
+
+modWork :: (FromRow w, Work w) => Connection -> Id -> w -> IO () -- ^ Modifying the informations of a work
+modWork conn n s = (addWork conn . cmpWork s . head) =<< (query conn sql infos)
+  where
+    infos :: (T.Text, T.Text, Int)
+    infos =
+      case n of
+        (IdF x) -> ("Films", "IdF", x)
+        (IdS x) -> ("Series", "IdS", x)
+        (IdB x) -> ("Books", "IdB", x)
+    sql :: Query
+    sql = "SELECT * FROM ? WHERE ? = ?"
 
 -- | If an error occurs, print it, else process the result
 orPrint :: Either String a -> (a -> IO()) -> IO ()

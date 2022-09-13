@@ -4,6 +4,8 @@ module Zamonia
   , Series(..)
   , Book(..)
   , Sort(..)
+  , Id(..)
+  , Cons
   , (<~>)
   , localLocation
   , booksLocation
@@ -14,9 +16,7 @@ module Zamonia
   , listFilms
   , listSeries
   , listBooks
-  , delFilm
-  , delSeries
-  , delBook
+  , delWork
   , fetchWork
   , addWork
   , modWork

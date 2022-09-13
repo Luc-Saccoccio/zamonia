@@ -109,12 +109,6 @@ instance Work Book where
             , _bread = compareFields w1 w2
             }
     queryAll conn = query_ conn "SELECT * FROM Books"
-    fetchWork conn n = queryNamed conn sql [":id" := n]
-      where
-        sql :: Query
-        sql = "SELECT * FROM Books WHERE IdB = :id"
-    modWork conn n f = (addWork conn . cmpWork f . head) =<<
-        (queryNamed conn "SELECT * FROM Books WHERE ISBN = :id" [":id" := n] :: IO [Book])
     replaceList (Book i is t o a pu y p w) = [ Replace "%index%" (T.pack $ show i)
                                            , Replace "%isbn%" is
                                            , Replace "%title%" t
@@ -124,10 +118,6 @@ instance Work Book where
                                            , Replace "%year%" y
                                            , Replace "%possession%" p
                                            , Replace "%read%" w]
-
--- | Delete the book matching the index
-delBook :: Connection -> Int -> IO ()
-delBook conn n = execute conn "DELETE FROM Books WHERE IdB = ?" (Only n)
 
 -- | Return a list of all books, sorted the way asked
 listBooks :: Sort -> Connection -> IO [(Int, T.Text, T.Text)]

@@ -108,10 +108,6 @@ instance Work Series where
             , _swatched = compareFields w1 w2
             }
     queryAll conn = query_ conn "SELECT * FROM Series"
-    fetchWork conn n = queryNamed conn sql [":id" := n]
-      where sql = "SELECT * FROM Series WHERE IdS = :id"
-    modWork conn n s = (addWork conn . cmpWork s . head) =<<
-        (queryNamed conn "SELECT * FROM Series WHERE IdS = :id" [":id" := n] :: IO [Series])
     replaceList (Series i t o d y e s p w) =  [ Replace "%index%" (T.pack $ show i)
                                              , Replace "%title%" t
                                              , Replace "%originalTitle%" o
@@ -121,10 +117,6 @@ instance Work Series where
                                              , Replace "%seasonNumber%" s
                                              , Replace "%possession%" p
                                              , Replace "%watched%" w]
-
--- | Delete the series matching the index
-delSeries :: Connection -> Int -> IO ()
-delSeries conn n = execute conn "DELETE FROM Series WHERE IdS = ?" (Only n)
 
 -- | Return a list of all series, sorted the way asked
 listSeries :: Sort -> Connection -> IO [(Int, T.Text, T.Text)]
