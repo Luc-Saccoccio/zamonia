@@ -33,6 +33,7 @@ import           Lens.Micro             (ASetter, Getting, _3, (%~), (&), (.~),
                                          (?~), (^.))
 import           Lens.Micro.TH
 import           System.Process.Typed   (ProcessConfig, proc, runProcess)
+import           Text.Printf
 import           Zamonia
 import           Zamonia.Work           (Work, listRepresentation, new)
 
@@ -309,7 +310,7 @@ editNote :: forall e. ResourceName -> AppState e -> EventM ResourceName (Next (A
 editNote focus state =
   case num of
     Nothing -> continueWithoutRedraw state
-    Just n -> liftIO (command n) >>= runProcess >> continue state
+    Just n -> (liftIO $! command n >>= runProcess) >> continue state -- FIXME: Cant' go back to zamonia
   where
     f :: Getting WorkList (AppState e) WorkList -> Maybe Int
     f = ((fst' . snd) <$>) . L.listSelectedElement . (state^.)
@@ -321,7 +322,7 @@ editNote focus state =
                         BooksTable -> (booksLocation, f bookTable)
                         _ -> error "editNot: focus is not right"
     command :: Int ->  IO (ProcessConfig () () ())
-    command n = liftM2 (\e l -> proc e [l ++ (show n ++ ".md")]) editor location -- FIXME: not nice
+    command n = liftM2 (\e l -> proc e [printf "%s%d.md" l n]) editor location
 
 appendForm :: ResourceName -> AppState e -> EventM ResourceName (Next (AppState e))
 appendForm focus state =
@@ -403,13 +404,13 @@ closeForm state =
       currentForm :: WorkForm e
       currentForm = fromJust $ state^.form
       addAndReturn :: Work w => w -> ASetter (AppState e) (AppState e) WorkList WorkList -> EventM ResourceName (Next (AppState e))
-      addAndReturn res getter = liftIO (addWork c res) >>
+      addAndReturn res getter = (liftIO $! addWork c res) >>
         let !prevRing = fromJust $ state^.previousFocusRing
          in
         continue (state
           & form .~ Nothing
-          & focusRing .~ prevRing
-          & getter %~ indexInsertList (listRepresentation res))
+          & focusRing .~ prevRing)
+          -- & getter %~ indexInsertList (listRepresentation res))
 
 handleEvent :: forall e. AppState e -> BrickEvent ResourceName e -> EventM ResourceName (Next (AppState e))
 handleEvent state event =

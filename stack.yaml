@@ -1,6 +1,7 @@
 resolver: lts-19.18
 extra-deps:
   - text-replace-0.1.0.1
-  - brick-0.73
+  - brick-1.1
+  - bimap-0.5.0
   - vty-5.36
   - text-zipper-0.12

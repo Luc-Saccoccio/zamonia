@@ -35,7 +35,7 @@ library:
     - typed-process
     - sqlite-simple
     - text
-    - brick >= 0.64
+    - brick
     - vector
     - vty
     - microlens
