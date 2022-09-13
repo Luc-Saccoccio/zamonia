@@ -11,10 +11,12 @@ import           Data.Aeson.Encode.Pretty (encodePretty)
 import qualified Data.ByteString.Lazy     as BS (readFile, writeFile)
 import           Data.Csv                 (FromRecord, HasHeader (..), ToRecord,
                                            decode, encode)
+import           Data.String              (IsString (fromString))
 import qualified Data.Text                as T (Text, null)
 import qualified Data.Text.Lazy           as L (Text, concat, pack)
 import           Data.Vector              (Vector)
-import           Database.SQLite.Simple   (Connection, Query, FromRow, execute, query)
+import           Database.SQLite.Simple   (Connection, FromRow, Query, execute,
+                                           query_)
 import           Text.Printf
 import           Text.Replace             (Replace, replaceWithList)
 
@@ -37,6 +39,9 @@ class Work a where
     entryToFormatted c w = replaceWithList (replaceList w) c
     toFullFormatted :: IO L.Text -> a -> IO L.Text
     toFullFormatted = (??) . (entryToFormatted <$>)
+
+uncurry3 :: (a -> b -> c -> d) -> (a, b, c) -> d
+uncurry3 f (x, y, z) = f x y z
 
 -- | Read the specified file, try to decode it. If it fails, print the error.
 -- If it didn't fail, add each entry to the database.
@@ -77,7 +82,7 @@ delWork conn n = execute conn sql infos
     sql = "DELETE FROM ? WHERE ? = ?"
 
 fetchWork :: (FromRow w, Work w) => Connection -> Id -> IO [w]
-fetchWork conn n = query conn sql infos
+fetchWork conn n = query_ conn . fromString $ uncurry3 (printf sql) infos
   where
     infos :: (T.Text, T.Text, Int)
     infos =
@@ -85,20 +90,11 @@ fetchWork conn n = query conn sql infos
         (IdF x) -> ("Films", "IdF", x)
         (IdS x) -> ("Series", "IdS", x)
         (IdB x) -> ("Books", "IdB", x)
-    sql :: Query
-    sql = "SELECT * FROM ? WHERE ? = ?"
+    -- sql :: Query
+    sql = "SELECT * FROM %s WHERE %s = %d"
 
 modWork :: (FromRow w, Work w) => Connection -> Id -> w -> IO () -- ^ Modifying the informations of a work
-modWork conn n s = (addWork conn . cmpWork s . head) =<< (query conn sql infos)
-  where
-    infos :: (T.Text, T.Text, Int)
-    infos =
-      case n of
-        (IdF x) -> ("Films", "IdF", x)
-        (IdS x) -> ("Series", "IdS", x)
-        (IdB x) -> ("Books", "IdB", x)
-    sql :: Query
-    sql = "SELECT * FROM ? WHERE ? = ?"
+modWork conn n s = addWork conn . cmpWork s . head =<< fetchWork conn n
 
 -- | If an error occurs, print it, else process the result
 orPrint :: Either String a -> (a -> IO()) -> IO ()
