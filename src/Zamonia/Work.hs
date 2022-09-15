@@ -81,7 +81,7 @@ delWork conn n = execute conn sql infos
     sql :: Query
     sql = "DELETE FROM ? WHERE ? = ?"
 
-fetchWork :: (FromRow w, Work w) => Connection -> Id -> IO [w]
+fetchWork :: (FromRow w, Work w) => Connection -> Id -> IO [w] -- TODO: Type returned isn't fixed
 fetchWork conn n = query_ conn . fromString $ uncurry3 (printf sql) infos
   where
     infos :: (T.Text, T.Text, Int)
@@ -90,7 +90,7 @@ fetchWork conn n = query_ conn . fromString $ uncurry3 (printf sql) infos
         (IdF x) -> ("Films", "IdF", x)
         (IdS x) -> ("Series", "IdS", x)
         (IdB x) -> ("Books", "IdB", x)
-    -- sql :: Query
+    sql :: String
     sql = "SELECT * FROM %s WHERE %s = %d"
 
 modWork :: (FromRow w, Work w) => Connection -> Id -> w -> IO () -- ^ Modifying the informations of a work

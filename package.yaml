@@ -40,6 +40,7 @@ library:
     - vty
     - microlens
     - microlens-th
+    - microlens-mtl
 
 executable:
   source-dirs: app

@@ -5,6 +5,7 @@
 1. I have no idea what I'm doing, but I'm doing it. Suggestions about code style are of course welcome.
 2. Don't expect anything from this tool, neither stability nor consistent update schedule
 3. Consequently, do not expect Windows/MacOS support. Do it yourself if you want it, I'm making this tool for me.
+4. I am not happy with the current state of the code (and probably will never be)
 
 ## Installation
 
