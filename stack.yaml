@@ -1,4 +1,4 @@
-resolver: lts-19.18
+resolver: lts-19.23
 extra-deps:
   - text-replace-0.1.0.1
   - brick-1.1

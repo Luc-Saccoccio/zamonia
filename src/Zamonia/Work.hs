@@ -15,7 +15,7 @@ import           Data.String              (IsString (fromString))
 import qualified Data.Text                as T (Text, null)
 import qualified Data.Text.Lazy           as L (Text, concat, pack)
 import           Data.Vector              (Vector)
-import           Database.SQLite.Simple   (Connection, FromRow, Query, execute,
+import           Database.SQLite.Simple   (Connection, FromRow, Query, execute, execute_,
                                            query_)
 import           Text.Printf
 import           Text.Replace             (Replace, replaceWithList)
@@ -70,7 +70,7 @@ allToFullFormatted (_ :: proxy work) file conn = fmap L.concat . mapM toFormatte
         template = L.pack <$> readFile file
 
 delWork :: Connection -> Id -> IO ()
-delWork conn n = execute conn sql infos
+delWork conn n = execute_ conn . fromString $ uncurry3 (printf sql) infos
   where
     infos :: (T.Text, T.Text, Int)
     infos =
@@ -78,8 +78,8 @@ delWork conn n = execute conn sql infos
         (IdF x) -> ("Films", "IdF", x)
         (IdS x) -> ("Series", "IdS", x)
         (IdB x) -> ("Books", "IdB", x)
-    sql :: Query
-    sql = "DELETE FROM ? WHERE ? = ?"
+    sql :: String
+    sql = "DELETE FROM %s WHERE %s = %d"
 
 fetchWork :: (FromRow w, Work w) => Connection -> Id -> IO [w] -- TODO: Type returned isn't fixed
 fetchWork conn n = query_ conn . fromString $ uncurry3 (printf sql) infos

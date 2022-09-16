@@ -33,7 +33,7 @@ import           Lens.Micro             (ASetter, Getting, Traversal,
                                          Traversal', _3, _Just, (%~), (&), (.~),
                                          (?~), (^.))
 import           Lens.Micro.Mtl         (use, zoom, (%=), (.=), (<<.=), (?=))
-import           Lens.Micro.TH
+import           Lens.Micro.TH          (makeLenses)
 import           System.Process.Typed   (ProcessConfig, proc, runProcess)
 import           Text.Printf
 import           Zamonia
@@ -69,7 +69,7 @@ data ResourceName = Id -- ^ ID or ISBN
             | BooksTable
             | RemoveDialog (ListItem, ResourceName)
             | InfoDialog (String, ResourceName)
-            | Help
+            | Help ResourceName
     deriving (Eq, Ord, Show)
 
 fst' :: (a, b, c) -> a
@@ -94,7 +94,7 @@ data AppState e = AppState
   , _removingDialog    :: Maybe (D.Dialog (Maybe Int))
   , _infoDialog        :: Maybe (D.Dialog ())
   , _conn              :: Connection
-  -- , _help :: Maybe (D.Dialog HelpChoice) -- TODO
+  , _helpDialog        :: Maybe (D.Dialog ())
   }
 
 makeLenses ''AppState
@@ -193,9 +193,10 @@ infoWidget :: Widget ResourceName
 infoWidget =
       str "a: add   "
   <=> str "e: edit  "
-  <=> str "x: remove"
-  <=> str "s: sort  "
+  <=> str "h: help  "
   <=> str "n: note  "
+  <=> str "s: sort  "
+  <=> str "x: remove"
   <+> fill ' '
 
 drawList :: WorkList -> Widget ResourceName
@@ -307,11 +308,11 @@ removeEntry focus =
       (focusRing <<.= F.focusRing [RemoveDialog (x, focus)]) >>= (previousFocusRing ?=)
       >> removingDialog ?= removeDialog n
 
-editNote :: forall e. ResourceName -> EventM ResourceName (AppState e) () -- TODO FIXME
+editNote :: forall e. ResourceName -> EventM ResourceName (AppState e) ()
 editNote focus =
   do
     num <- ((fst' . snd) <$>) . L.listSelectedElement <$> use getter
-    maybe continueWithoutRedraw (suspendAndResume' . void . (command >=> runProcess)) num
+    maybe continueWithoutRedraw (suspendAndResume' . void . (command >=> runProcess)) num -- TODO: CHECK FOR EXIT CODE !
   where
     location :: IO FilePath
     (location, getter) = case focus of
@@ -324,12 +325,12 @@ editNote focus =
 
 appendForm :: ResourceName -> EventM ResourceName (AppState e) ()
 appendForm focus = do
-  (focus', form') <- -- TODO:CLEAN THIS
+  (focus', form') <- -- TODO: CLEAN THIS
                   case focus of
                     SeriesTable -> do
                       l <- use seriesTable
                       let newSeriesForm = seriesForm (new & sid .~ maxId l)
-                       in return(formFocus newSeriesForm, S newSeriesForm)
+                       in return (formFocus newSeriesForm, S newSeriesForm)
                     FilmsTable  -> do
                       l <- use filmTable
                       let newFilmForm = filmForm (new & fid .~ maxId l)
@@ -376,21 +377,20 @@ editForm focus =
              >>= \item -> focusRing <<.= formFocus item >>= (previousFocusRing ?=) >> form ?= B item
            _ -> error "editForm: focus is not right"
 
--- TODO: Test requery of the whole list instead of inserting
 closeForm :: forall e. EventM ResourceName (AppState e) ()
 closeForm = do
   currentForm <- fromJust <$> (form <<.= Nothing)
   c <- use conn
-  case currentForm of
+  case currentForm of -- FIXME: Lots of reused code
     S sForm ->
       let result = formState sForm :: Series
-       in addAndReturn c result
+       in addAndReturn c result >> ((seriesTable .=) =<< (initialList SeriesTable <$> (liftIO $ listSeries Names c)))
     F fForm ->
       let result = formState fForm :: Film
-       in addAndReturn c result
+       in addAndReturn c result >> ((filmTable .=) =<< (initialList FilmsTable <$> (liftIO $ listFilms Names c)))
     B bForm ->
       let result = formState bForm :: Book
-       in addAndReturn c result
+       in addAndReturn c result >> ((bookTable .=) =<< (initialList BooksTable <$> (liftIO $ listBooks Names c)))
   prevRing <- previousFocusRing <<.= Nothing
   form .= Nothing
   focusRing .= fromJust prevRing
@@ -398,6 +398,19 @@ closeForm = do
     where
       addAndReturn :: Work w => Connection -> w -> EventM ResourceName (AppState e) ()
       addAndReturn c res = liftIO $! addWork c res
+
+renderHelpDialog :: Maybe (D.Dialog ()) -> Widget ResourceName
+renderHelpDialog (Just d) =
+  D.renderDialog d
+    $ padAll 1
+    $ vBox
+        [ C.hCenter (str "TEXT GOES HERE") ]
+renderHelpDialog Nothing = str ""
+
+help :: ResourceName -> EventM ResourceName (AppState e) ()
+help focus =
+  (focusRing <<.= F.focusRing [Help focus]) >>= (previousFocusRing ?=)
+  >> helpDialog ?= (D.dialog (Just "Help") (Just (0, [("Ok", ())])) 80)
 
 handleEvent :: forall e. BrickEvent ResourceName e -> EventM ResourceName (AppState e) ()
 handleEvent event = do
@@ -410,8 +423,10 @@ handleEvent event = do
       VtyEvent (V.EvKey V.KEsc [])        -> halt
       VtyEvent (V.EvKey (V.KChar 'a') []) -> appendForm (fromJust focus)
       VtyEvent (V.EvKey (V.KChar 'e') []) -> editForm (fromJust focus)
-      VtyEvent (V.EvKey (V.KChar 'x') []) -> removeEntry (fromJust focus)
       VtyEvent (V.EvKey (V.KChar 'n') []) -> editNote (fromJust focus)
+      VtyEvent (V.EvKey (V.KChar 'h') []) -> help (fromJust focus)
+      -- VtyEvent (V.EvKey (V.KChar 's') []) -> sort (fromJust focus)
+      VtyEvent (V.EvKey (V.KChar 'x') []) -> removeEntry (fromJust focus)
       VtyEvent (V.EvKey V.KEnter [])      -> showInformation (fromJust focus)
       VtyEvent ev ->
         let handledEvent = L.handleListEventVi L.handleListEvent ev
@@ -451,10 +466,16 @@ handleEvent event = do
           prevFocus <- previousFocusRing <<.= Nothing
           focusRing .= fromJust prevFocus
           infoDialog .= Nothing
+      (Just (Help _), VtyEvent (V.EvKey V.KEnter [])) ->
+        do
+          prevFocus <- previousFocusRing <<.= Nothing
+          focusRing .= fromJust prevFocus
+          helpDialog .= Nothing
       (Just (RemoveDialog _), VtyEvent ev) ->
         zoom (removingDialog . _Just) (D.handleDialogEvent ev)
       (Just (InfoDialog _), VtyEvent ev) ->
         zoom (infoDialog . _Just) (D.handleDialogEvent ev)
+      (Just (Help _), VtyEvent ev) -> zoom (helpDialog . _Just) (D.handleDialogEvent ev)
       (Just _, VtyEvent (V.EvKey V.KEsc [])) ->
         do
           prevRing <- fromJust <$> (previousFocusRing <<.= Nothing)
@@ -493,6 +514,7 @@ drawUI state =
                 renderRemoveDialog x (state^.removingDialog):background table
               (InfoDialog (w, table)) ->
                 renderInfoDialog w (state^.infoDialog):background table
+              (Help table) -> renderHelpDialog (state^.helpDialog):background table
               _           -> error "drawUI: focus is not right"
 
 appCursor :: AppState e -> [CursorLocation ResourceName] -> Maybe (CursorLocation ResourceName)
@@ -518,6 +540,7 @@ initState c = do
              , _filmTable = fList
              , _bookTable = bList
              , _form = Nothing
+             , _helpDialog = Nothing
              , _conn = c
              }
 
